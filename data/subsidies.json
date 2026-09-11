@@ -1,0 +1,177 @@
+[
+  {
+    "id": "national_long_life_quality_housing",
+    "name": "Long-Life Quality Housing Renovation Promotion Project",
+    "prefecture": "Nationwide",
+    "municipality": "Programme national (toutes préfectures)",
+    "level": "national",
+    "type": "renovation",
+    "maxAmountJpy": 2500000,
+    "coveragePercent": 33,
+    "conditions": [
+      "Rénovation visant une durabilité et une performance thermique élevées (Long-Life Quality Housing)",
+      "Ouvert aux résidents étrangers propriétaires"
+    ],
+    "eligibility": {
+      "minResidenceYears": null,
+      "requiresLocalContractor": null,
+      "requiresAkiyaBank": false,
+      "ageLimit": null
+    },
+    "applicationDeadline": "Selon exercice budgétaire en cours — vérifier avant travaux",
+    "sourceName": "Old Houses Japan — Grants & Subsidies database",
+    "sourceUrl": "https://www.oldhousesjapan.com/resources/grants-subsidies",
+    "verifiedAt": "2026-09-11",
+    "confidence": "verified"
+  },
+  {
+    "id": "wakayama_prefecture_renovation",
+    "name": "Wakayama Prefecture Akiya Renovation Subsidy",
+    "prefecture": "Wakayama",
+    "municipality": "Préfecture de Wakayama",
+    "level": "prefectural",
+    "type": "renovation",
+    "maxAmountJpy": 1000000,
+    "coveragePercent": 50,
+    "conditions": [
+      "Rénovation d'un akiya sur l'ensemble de la préfecture de Wakayama",
+      "Ouvert aux résidents étrangers propriétaires"
+    ],
+    "eligibility": {
+      "minResidenceYears": null,
+      "requiresLocalContractor": null,
+      "requiresAkiyaBank": false,
+      "ageLimit": null
+    },
+    "applicationDeadline": "Avant début des travaux",
+    "sourceName": "Old Houses Japan — Grants & Subsidies database",
+    "sourceUrl": "https://www.oldhousesjapan.com/resources/grants-subsidies",
+    "verifiedAt": "2026-09-11",
+    "confidence": "verified"
+  },
+  {
+    "id": "wakayama_koya_relocation",
+    "name": "Migration and Settlement Promotion Subsidy Program (Koya)",
+    "prefecture": "Wakayama",
+    "municipality": "Koya, Wakayama",
+    "level": "municipal",
+    "type": "relocation",
+    "maxAmountJpy": 2000000,
+    "coveragePercent": 50,
+    "conditions": [
+      "Programme de soutien à la migration et à l'installation (Koya)",
+      "Ouvert aux résidents étrangers"
+    ],
+    "eligibility": {
+      "minResidenceYears": null,
+      "requiresLocalContractor": null,
+      "requiresAkiyaBank": false,
+      "ageLimit": null
+    },
+    "applicationDeadline": "Avant installation",
+    "sourceName": "Old Houses Japan — Grants & Subsidies database",
+    "sourceUrl": "https://www.oldhousesjapan.com/resources/grants-subsidies",
+    "verifiedAt": "2026-09-11",
+    "confidence": "verified"
+  },
+  {
+    "id": "hokkaido_toma_future_connecting",
+    "name": "Future-Connecting Land Use Promotion Program",
+    "prefecture": "Hokkaido",
+    "municipality": "Toma, Hokkaido",
+    "level": "municipal",
+    "type": "renovation",
+    "maxAmountJpy": 4500000,
+    "coveragePercent": null,
+    "conditions": [
+      "Achat, démolition ou construction utilisant du bois local, pour résidents ou futurs migrants à Toma",
+      "Ouvert aux résidents étrangers"
+    ],
+    "eligibility": {
+      "minResidenceYears": null,
+      "requiresLocalContractor": null,
+      "requiresAkiyaBank": false,
+      "ageLimit": null
+    },
+    "applicationDeadline": "Selon exercice budgétaire en cours — vérifier avant travaux",
+    "sourceName": "Old Houses Japan — Future-Connecting Land Use Promotion Program",
+    "sourceUrl": "https://www.oldhousesjapan.com/resources/grants-subsidies/961",
+    "verifiedAt": "2026-09-11",
+    "confidence": "verified"
+  },
+  {
+    "id": "niigata_sado_revitalization",
+    "name": "Promotion Program for Vacant Home Revitalization",
+    "prefecture": "Niigata",
+    "municipality": "Sado City, Niigata",
+    "level": "municipal",
+    "type": "renovation",
+    "maxAmountJpy": 20000000,
+    "coveragePercent": 80,
+    "conditions": [
+      "Programme de revitalisation des maisons vacantes de Sado City — le montant le plus élevé recensé dans la base source",
+      "Ouvert aux résidents étrangers propriétaires"
+    ],
+    "eligibility": {
+      "minResidenceYears": null,
+      "requiresLocalContractor": null,
+      "requiresAkiyaBank": false,
+      "ageLimit": null
+    },
+    "applicationDeadline": "Avant début des travaux",
+    "sourceName": "Old Houses Japan — Grants & Subsidies database",
+    "sourceUrl": "https://www.oldhousesjapan.com/resources/grants-subsidies",
+    "verifiedAt": "2026-09-11",
+    "confidence": "verified"
+  },
+  {
+    "id": "niigata_prefecture_utilization",
+    "name": "Niigata Prefecture Akiya Utilization Support Program",
+    "prefecture": "Niigata",
+    "municipality": "Préfecture de Niigata",
+    "level": "prefectural",
+    "type": "renovation",
+    "maxAmountJpy": 1100000,
+    "coveragePercent": 50,
+    "conditions": [
+      "Programme de soutien à l'utilisation des akiya sur l'ensemble de la préfecture de Niigata",
+      "Ouvert aux résidents étrangers propriétaires"
+    ],
+    "eligibility": {
+      "minResidenceYears": null,
+      "requiresLocalContractor": null,
+      "requiresAkiyaBank": false,
+      "ageLimit": null
+    },
+    "applicationDeadline": "Avant début des travaux",
+    "sourceName": "Old Houses Japan — Grants & Subsidies database",
+    "sourceUrl": "https://www.oldhousesjapan.com/resources/grants-subsidies",
+    "verifiedAt": "2026-09-11",
+    "confidence": "verified"
+  },
+  {
+    "id": "okayama_yakage_renovation",
+    "name": "Vacant Home Renovation Subsidy (Yakage)",
+    "prefecture": "Okayama",
+    "municipality": "Yakage, Okayama",
+    "level": "municipal",
+    "type": "renovation",
+    "maxAmountJpy": 1500000,
+    "coveragePercent": null,
+    "conditions": [
+      "Rénovation d'un bien inscrit à l'akiya bank de Yakage",
+      "Ouvert aux résidents étrangers propriétaires"
+    ],
+    "eligibility": {
+      "minResidenceYears": null,
+      "requiresLocalContractor": null,
+      "requiresAkiyaBank": true,
+      "ageLimit": null
+    },
+    "applicationDeadline": "Avant début des travaux",
+    "sourceName": "Old Houses Japan — Grants & Subsidies database",
+    "sourceUrl": "https://www.oldhousesjapan.com/resources/grants-subsidies",
+    "verifiedAt": "2026-09-11",
+    "confidence": "verified"
+  }
+]

@@ -218,6 +218,8 @@ export interface BudgetScenario {
   label: ScenarioLabel;
   multiplier: number;
   travauxJpy: number;
+  subsidiesJpy: number;
+  netTravauxJpy: number;
   totalProjetJpy: number;
   totalProjetEur: number;
 }
@@ -227,6 +229,7 @@ export function computeBudgetScenarios(
   profile: BuyerProfile,
   niveauTravaux: RenovationLevel,
   refinement?: RenovationRefinement | null,
+  subsidiesJpy = 0,
 ): BudgetScenario[] {
   const acquisitionFees = computeAcquisitionFees(prixAchatJpy, profile);
   const totalAcquisitionJpy = prixAchatJpy + acquisitionFees.total;
@@ -242,11 +245,18 @@ export function computeBudgetScenarios(
 
   return (Object.keys(SCENARIO_MULTIPLIERS) as ScenarioLabel[]).map((label) => {
     const travauxJpy = travauxByLabel[label];
-    const totalProjetJpy = totalAcquisitionJpy + travauxJpy;
+    // Les subventions réduisent le net à payer, jamais le montant brut des
+    // travaux affiché ailleurs (travauxJpy reste la valeur brute, inchangée,
+    // pour ne pas modifier silencieusement ce qu'affichent déjà
+    // resultat-section.tsx / opportunity-section.tsx).
+    const netTravauxJpy = Math.max(0, travauxJpy - subsidiesJpy);
+    const totalProjetJpy = totalAcquisitionJpy + netTravauxJpy;
     return {
       label,
       multiplier: SCENARIO_MULTIPLIERS[label],
       travauxJpy,
+      subsidiesJpy,
+      netTravauxJpy,
       totalProjetJpy,
       totalProjetEur: jpyToEur(totalProjetJpy),
     };

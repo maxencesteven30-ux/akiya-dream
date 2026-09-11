@@ -18,6 +18,7 @@ import { RegionFinder } from "@/components/simulateur/region-finder";
 import { JapanMap } from "@/components/simulateur/japan-map";
 import { RealListingSection } from "@/components/simulateur/real-listing-section";
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
+import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
@@ -54,6 +55,7 @@ export function Simulateur() {
     Record<string, RegionAttributeDetail[]>
   >({});
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  const [subsidiesJpy, setSubsidiesJpy] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -261,6 +263,7 @@ export function Simulateur() {
               profile={state.profile}
               renovationLevel={state.renovationLevel}
               realListing={state.realListing}
+              subsidiesJpy={subsidiesJpy}
             />
             <Separator />
             <BudgetSection
@@ -273,6 +276,9 @@ export function Simulateur() {
               onReserveChange={setReserveSecuriteEur}
               realListing={state.realListing}
             />
+
+            <Separator />
+            <SubsidiesSection prefecture={state.prefecture} onTotalChange={setSubsidiesJpy} />
 
             {state.realListing && (
               <>

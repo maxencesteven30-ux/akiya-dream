@@ -115,6 +115,38 @@ export interface RegionAttributeDetail {
   notes: string | null;
 }
 
+export type SubsidyType = "renovation" | "relocation";
+export type SubsidyLevel = "national" | "prefectural" | "municipal";
+
+export interface SubsidyEligibility {
+  // null = non précisé de façon fiable par la source pour ce programme
+  // précis (jamais une supposition) ; requiresAkiyaBank est le seul champ
+  // toujours connu car explicitement signalé par la source pour chaque
+  // programme.
+  minResidenceYears: number | null;
+  requiresLocalContractor: boolean | null;
+  requiresAkiyaBank: boolean;
+  ageLimit: number | null;
+}
+
+export interface Subsidy {
+  id: string;
+  name: string;
+  prefecture: string;
+  municipality: string;
+  level: SubsidyLevel;
+  type: SubsidyType;
+  maxAmountJpy: number;
+  coveragePercent: number | null;
+  conditions: string[];
+  eligibility: SubsidyEligibility;
+  applicationDeadline: string;
+  sourceName: string;
+  sourceUrl: string | null;
+  verifiedAt: string;
+  confidence: DataConfidence;
+}
+
 export interface NewProjectInput {
   name: string;
   profile: BuyerProfile;

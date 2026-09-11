@@ -39,6 +39,7 @@ interface ResultatSectionProps {
   profile: BuyerProfile | null;
   renovationLevel: RenovationLevel | null;
   realListing: RealListing | null;
+  subsidiesJpy?: number;
 }
 
 const SEGMENT_COLORS = {
@@ -53,6 +54,7 @@ export function ResultatSection({
   profile,
   renovationLevel,
   realListing,
+  subsidiesJpy = 0,
 }: ResultatSectionProps) {
   const ready = Boolean(profile && region && renovationLevel);
 
@@ -88,8 +90,8 @@ export function ResultatSection({
 
   const scenarios = useMemo(() => {
     if (!profile || !renovationLevel) return null;
-    return computeBudgetScenarios(housePriceJpy, profile, renovationLevel, refinement);
-  }, [housePriceJpy, profile, renovationLevel, refinement]);
+    return computeBudgetScenarios(housePriceJpy, profile, renovationLevel, refinement, subsidiesJpy);
+  }, [housePriceJpy, profile, renovationLevel, refinement, subsidiesJpy]);
 
   const riskFlags = useMemo(() => {
     if (!profile || !renovationLevel) return [];
@@ -425,6 +427,12 @@ function ScenarioComparison({
               Travaux : {formatJpy(scenario.travauxJpy)}{" "}
               <span className="text-xs">(≈ {formatEur(jpyToEur(scenario.travauxJpy))})</span>
             </p>
+            {scenario.subsidiesJpy > 0 && (
+              <p className="text-xs text-emerald-600">
+                − {formatJpy(scenario.subsidiesJpy)} d&apos;aides ={" "}
+                {formatJpy(scenario.netTravauxJpy)} net
+              </p>
+            )}
             <p className="text-foreground">
               Total : {formatJpy(scenario.totalProjetJpy)}
             </p>

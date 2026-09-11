@@ -180,6 +180,26 @@ describe("computeBudgetScenarios", () => {
     expect(realiste.totalProjetJpy).toBeCloseTo(12_415_000, 6); // +800 000
     expect(prudent.totalProjetJpy).toBeCloseTo(13_215_000, 6); // +1 600 000
   });
+
+  it("sans subvention (défaut), travauxJpy et netTravauxJpy sont identiques (non-régression)", () => {
+    const [optimiste] = computeBudgetScenarios(3_000_000, "solo", "standard");
+    expect(optimiste.subsidiesJpy).toBe(0);
+    expect(optimiste.netTravauxJpy).toBe(optimiste.travauxJpy);
+  });
+
+  it("une subvention réduit le net à payer et le total, sans modifier le brut travauxJpy", () => {
+    const [optimiste] = computeBudgetScenarios(3_000_000, "solo", "standard", null, 2_000_000);
+    expect(optimiste.travauxJpy).toBe(8_000_000); // brut inchangé
+    expect(optimiste.subsidiesJpy).toBe(2_000_000);
+    expect(optimiste.netTravauxJpy).toBe(6_000_000);
+    expect(optimiste.totalProjetJpy).toBeCloseTo(11_615_000 - 2_000_000, 6);
+  });
+
+  it("une subvention supérieure aux travaux ne produit jamais un net négatif", () => {
+    const [optimiste] = computeBudgetScenarios(3_000_000, "solo", "leger", null, 50_000_000);
+    expect(optimiste.netTravauxJpy).toBe(0);
+    expect(optimiste.totalProjetJpy).toBeCloseTo(3_000_000 + 615_000, 6);
+  });
 });
 
 describe("computeRiskFlags", () => {
