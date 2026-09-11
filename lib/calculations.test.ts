@@ -210,4 +210,31 @@ describe("computeRiskFlags", () => {
     const flags = computeRiskFlags("solo", "leger", SAMPLE_REGION_LOW_RISK);
     expect(flags.some((f) => f.key === "rural-access")).toBe(true);
   });
+
+  it("utilise l'année réelle du bien plutôt que la moyenne régionale quand elle est fournie", () => {
+    // Région à faible risque (30% pré-1981) mais bien réel construit en 1975 -> flag précis
+    const flags = computeRiskFlags("solo", "leger", SAMPLE_REGION_LOW_RISK, 1975);
+    expect(flags.some((f) => f.key === "old-construction")).toBe(false);
+    expect(flags.some((f) => f.key === "old-construction-house")).toBe(true);
+    expect(flags.find((f) => f.key === "old-construction-house")?.message).toContain("1975");
+  });
+
+  it("ne signale rien sur l'ancienneté si l'année réelle du bien est récente, même en région à risque", () => {
+    const flags = computeRiskFlags("solo", "leger", SAMPLE_REGION_HIGH_RISK, 2005);
+    expect(flags.some((f) => f.key === "old-construction")).toBe(false);
+    expect(flags.some((f) => f.key === "old-construction-house")).toBe(false);
+  });
+
+  it("signale l'éloignement de la gare avec la distance réelle plutôt que le rappel générique", () => {
+    const flags = computeRiskFlags("solo", "leger", SAMPLE_REGION_LOW_RISK, null, 20);
+    expect(flags.some((f) => f.key === "rural-access")).toBe(false);
+    expect(flags.some((f) => f.key === "isolated-station-distance")).toBe(true);
+    expect(flags.find((f) => f.key === "isolated-station-distance")?.message).toContain("20 km");
+  });
+
+  it("ne signale pas d'éloignement si la distance réelle est sous le seuil", () => {
+    const flags = computeRiskFlags("solo", "leger", SAMPLE_REGION_LOW_RISK, null, 5);
+    expect(flags.some((f) => f.key === "isolated-station-distance")).toBe(false);
+    expect(flags.some((f) => f.key === "rural-access")).toBe(false);
+  });
 });

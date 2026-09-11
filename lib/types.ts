@@ -41,6 +41,15 @@ export type BuyerProfile = "solo" | "duo" | "investisseur";
 
 export type RenovationLevel = "leger" | "standard" | "lourd";
 
+export interface RealListing {
+  name: string;
+  city: string;
+  surfaceM2: number | null;
+  landM2: number | null;
+  constructionYear: number | null;
+  stationDistanceKm: number | null;
+}
+
 export interface SimulatorState {
   profile: BuyerProfile | null;
   housePriceJpy: number;
@@ -48,6 +57,7 @@ export interface SimulatorState {
   renovationLevel: RenovationLevel | null;
   capitalDisponibleEur: number | null;
   reserveSecuriteEur: number | null;
+  realListing: RealListing | null;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

@@ -15,10 +15,12 @@ import { ResultatSection } from "@/components/simulateur/resultat-section";
 import { BudgetSection } from "@/components/simulateur/budget-section";
 import { ComparateurSection } from "@/components/simulateur/comparateur-section";
 import { RegionFinder } from "@/components/simulateur/region-finder";
+import { RealListingSection } from "@/components/simulateur/real-listing-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import type {
   BuyerProfile,
+  RealListing,
   RegionAttributeDetail,
   RegionAttributes,
   RenovationLevel,
@@ -36,6 +38,7 @@ const DEFAULT_STATE: SimulatorState = {
   renovationLevel: null,
   capitalDisponibleEur: null,
   reserveSecuriteEur: null,
+  realListing: null,
 };
 
 export function Simulateur() {
@@ -124,11 +127,15 @@ export function Simulateur() {
     setState((prev) => ({ ...prev, capitalDisponibleEur }));
   const setReserveSecuriteEur = (reserveSecuriteEur: number | null) =>
     setState((prev) => ({ ...prev, reserveSecuriteEur }));
+  const setRealListing = (realListing: RealListing | null) =>
+    setState((prev) => ({ ...prev, realListing }));
 
   const addToComparateur = () => {
     if (!state.profile || !state.renovationLevel) return;
 
-    const baseName = state.prefecture ? state.prefecture.replace(/_/g, " ") : "Projet";
+    const baseName =
+      state.realListing?.name.trim() ||
+      (state.prefecture ? state.prefecture.replace(/_/g, " ") : "Projet");
     const existingNames = new Set(savedProjects.map((p) => p.name));
     let name = baseName;
     let suffix = 2;
@@ -195,6 +202,7 @@ export function Simulateur() {
               renovationLevel={state.renovationLevel}
               onRenovationLevelChange={setRenovationLevel}
             />
+            <RealListingSection realListing={state.realListing} onChange={setRealListing} />
           </>
         )}
       </AnimatePresence>
@@ -208,6 +216,7 @@ export function Simulateur() {
               region={regions.find((r) => r.prefecture === state.prefecture) ?? null}
               profile={state.profile}
               renovationLevel={state.renovationLevel}
+              realListing={state.realListing}
             />
             <Separator />
             <BudgetSection

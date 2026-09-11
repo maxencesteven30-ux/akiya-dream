@@ -265,10 +265,18 @@ export interface RiskFlag {
 
 const RISK_DISCLAIMER_SUFFIX = "à vérifier avec un professionnel";
 
+// Distance à partir de laquelle on signale un risque d'enclavement /
+// dépendance à la voiture. Seuil explicite posé ici, appliqué
+// uniquement quand l'utilisateur fournit une distance réelle mesurée
+// pour SON bien (donnée qu'il apporte lui-même, pas une moyenne).
+const ISOLATED_STATION_DISTANCE_KM = 15;
+
 export function computeRiskFlags(
   profile: BuyerProfile,
   renovationLevel: RenovationLevel,
   region: Region | null,
+  constructionYear?: number | null,
+  stationDistanceKm?: number | null,
 ): RiskFlag[] {
   const flags: RiskFlag[] = [];
 
@@ -290,7 +298,20 @@ export function computeRiskFlags(
     });
   }
 
-  if (region && region.pre1981Percent >= OLD_CONSTRUCTION_THRESHOLD_PERCENT) {
+  // L'année réelle du bien (fournie par l'utilisateur) est plus précise
+  // que le pourcentage régional agrégé : elle prend le pas quand elle
+  // est disponible, plutôt que d'empiler les deux signaux.
+  if (constructionYear !== undefined && constructionYear !== null) {
+    if (constructionYear < 1981) {
+      flags.push({
+        key: "old-construction-house",
+        message:
+          `Point de vigilance — ce bien daterait de ${constructionYear} ` +
+          `(antérieur à 1981) : une vérification technique (séisme, amiante) ` +
+          `est recommandée (${RISK_DISCLAIMER_SUFFIX})`,
+      });
+    }
+  } else if (region && region.pre1981Percent >= OLD_CONSTRUCTION_THRESHOLD_PERCENT) {
     const name = region.prefecture.replace(/_/g, " ");
     flags.push({
       key: "old-construction",
@@ -301,7 +322,19 @@ export function computeRiskFlags(
     });
   }
 
-  if (region) {
+  // Idem : une distance réelle mesurée pour ce bien précis remplace le
+  // rappel générique par un signal plus concret.
+  if (stationDistanceKm !== undefined && stationDistanceKm !== null) {
+    if (stationDistanceKm >= ISOLATED_STATION_DISTANCE_KM) {
+      flags.push({
+        key: "isolated-station-distance",
+        message:
+          `Point de vigilance — ce bien est à ${stationDistanceKm} km de la gare ` +
+          `la plus proche : vérifiez la dépendance à la voiture et l'accès aux ` +
+          `services au quotidien.`,
+      });
+    }
+  } else if (region) {
     flags.push({
       key: "rural-access",
       message:

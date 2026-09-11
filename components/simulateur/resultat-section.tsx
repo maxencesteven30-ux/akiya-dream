@@ -29,13 +29,14 @@ import {
 } from "@/lib/calculations";
 import type { ScenarioLabel } from "@/lib/calculations";
 import { formatEur, formatJpy } from "@/lib/format";
-import type { BuyerProfile, Region, RenovationLevel } from "@/lib/types";
+import type { BuyerProfile, RealListing, Region, RenovationLevel } from "@/lib/types";
 
 interface ResultatSectionProps {
   housePriceJpy: number;
   region: Region | null;
   profile: BuyerProfile | null;
   renovationLevel: RenovationLevel | null;
+  realListing: RealListing | null;
 }
 
 const SEGMENT_COLORS = {
@@ -49,6 +50,7 @@ export function ResultatSection({
   region,
   profile,
   renovationLevel,
+  realListing,
 }: ResultatSectionProps) {
   const ready = Boolean(profile && region && renovationLevel);
 
@@ -81,8 +83,14 @@ export function ResultatSection({
 
   const riskFlags = useMemo(() => {
     if (!profile || !renovationLevel) return [];
-    return computeRiskFlags(profile, renovationLevel, region);
-  }, [profile, renovationLevel, region]);
+    return computeRiskFlags(
+      profile,
+      renovationLevel,
+      region,
+      realListing?.constructionYear,
+      realListing?.stationDistanceKm,
+    );
+  }, [profile, renovationLevel, region, realListing]);
 
   return (
     <motion.section
@@ -93,14 +101,29 @@ export function ResultatSection({
       <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
         Étape 3 — Le choc de réalité
       </h2>
-      <div className="mb-5 flex items-center gap-2">
-        <p className="text-lg text-foreground">Du prix affiché au coût réel</p>
+      <div className="mb-1 flex items-center gap-2">
+        <p className="text-lg text-foreground">
+          {realListing?.name ? realListing.name : "Du prix affiché au coût réel"}
+        </p>
         {region && (
           <Badge variant="secondary" className="font-normal">
             {region.prefecture.replace(/_/g, " ")} — niveau {region.recommendationLevel}
           </Badge>
         )}
       </div>
+      <p className="mb-5 text-sm text-muted-foreground">
+        {[
+          realListing?.city || null,
+          realListing?.surfaceM2 ? `${realListing.surfaceM2} m² habitables` : null,
+          realListing?.landM2 ? `${realListing.landM2} m² de terrain` : null,
+          realListing?.constructionYear ? `construit en ${realListing.constructionYear}` : null,
+          realListing?.stationDistanceKm !== null && realListing?.stationDistanceKm !== undefined
+            ? `${realListing.stationDistanceKm} km de la gare`
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ") || " "}
+      </p>
 
       <Card className="border-border p-6 sm:p-8">
         {!ready || !budget ? (
