@@ -95,7 +95,11 @@ export function SubsidiesSection({
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {subsidy.conditions.map((condition, i) => (
-                    <Badge key={i} variant="outline" className="font-normal">
+                    <Badge
+                      key={i}
+                      variant="outline"
+                      className="h-auto max-w-full whitespace-normal text-left font-normal"
+                    >
                       {condition}
                     </Badge>
                   ))}
