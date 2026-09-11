@@ -17,10 +17,13 @@ import { ComparateurSection } from "@/components/simulateur/comparateur-section"
 import { RegionFinder } from "@/components/simulateur/region-finder";
 import { JapanMap } from "@/components/simulateur/japan-map";
 import { RealListingSection } from "@/components/simulateur/real-listing-section";
+import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import type {
   BuyerProfile,
+  NewProjectInput,
+  PersistedProject,
   RealListing,
   RegionAttributeDetail,
   RegionAttributes,
@@ -160,6 +163,34 @@ export function Simulateur() {
   const removeFromComparateur = (id: string) =>
     setSavedProjects((prev) => prev.filter((p) => p.id !== id));
 
+  const currentProjectInput: NewProjectInput | null =
+    state.profile && state.renovationLevel
+      ? {
+          name:
+            state.realListing?.name.trim() ||
+            (state.prefecture ? state.prefecture.replace(/_/g, " ") : "Mon projet"),
+          profile: state.profile,
+          housePriceJpy: state.housePriceJpy,
+          prefecture: state.prefecture,
+          renovationLevel: state.renovationLevel,
+          capitalDisponibleEur: state.capitalDisponibleEur,
+          reserveSecuriteEur: state.reserveSecuriteEur,
+          realListing: state.realListing,
+        }
+      : null;
+
+  const loadPersistedProject = (project: PersistedProject) => {
+    setState({
+      profile: project.profile,
+      housePriceJpy: project.housePriceJpy,
+      prefecture: project.prefecture,
+      renovationLevel: project.renovationLevel,
+      capitalDisponibleEur: project.capitalDisponibleEur,
+      reserveSecuriteEur: project.reserveSecuriteEur,
+      realListing: project.realListing,
+    });
+  };
+
   if (loading) {
     return <SimulateurSkeleton />;
   }
@@ -180,6 +211,8 @@ export function Simulateur() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-10 px-6 py-10 sm:space-y-12 sm:px-8 sm:py-14">
+      <SavedProjectsSection currentProject={currentProjectInput} onLoad={loadPersistedProject} />
+
       <ProfilSection value={state.profile} onChange={setProfile} />
 
       <AnimatePresence>
