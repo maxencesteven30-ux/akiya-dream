@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   categorizeOpportunityScore,
   computeConfidenceLevel,
+  computeInterestingZone,
   computeMaxAffordablePrice,
   computeOpportunityScore,
   computePriceSensitivity,
@@ -368,6 +369,59 @@ describe("computePriceSensitivity — analyse de sensibilité (V2)", () => {
     const prices = points.map((p) => p.prixJpy);
     expect(prices).toEqual([...prices].sort((a, b) => a - b));
     expect(new Set(prices).size).toBe(prices.length);
+  });
+
+  it("expose le projet total (JPY et EUR) cohérent avec le moteur réel", () => {
+    const input = baseInput({
+      listing: { ...EMPTY_LISTING, constructionYear: 1990, surfaceM2: 80, condition: "fair" },
+    });
+    const points = computePriceSensitivity(input);
+    for (const point of points) {
+      const direct = computeOpportunityScore({ ...input, prixAchatJpy: point.prixJpy });
+      expect(point.totalProjetJpy).toBe(direct.budget.totalProjetJpy);
+      expect(point.totalProjetEur).toBeCloseTo(direct.budget.totalProjetEur, 6);
+    }
+  });
+});
+
+describe("computeInterestingZone — zone de négociation intéressante (V2)", () => {
+  it("retourne une plage [min, max] où le score atteint le seuil visé", () => {
+    const input = baseInput({
+      prixAchatJpy: 6_000_000,
+      listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 70, condition: "good" },
+    });
+    const zone = computeInterestingZone(input);
+    expect(zone).not.toBeNull();
+    expect(zone!.minJpy).toBeLessThanOrEqual(zone!.maxJpy);
+
+    const atMin = computeOpportunityScore({ ...input, prixAchatJpy: zone!.minJpy });
+    const atMax = computeOpportunityScore({ ...input, prixAchatJpy: zone!.maxJpy });
+    expect(atMin.score).toBeGreaterThanOrEqual(7);
+    expect(atMax.score).toBeGreaterThanOrEqual(7);
+  });
+
+  it("ne recommande jamais un prix supérieur au prix demandé actuel", () => {
+    const input = baseInput({
+      prixAchatJpy: 6_000_000,
+      listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 70, condition: "good" },
+    });
+    const zone = computeInterestingZone(input);
+    if (zone) {
+      expect(zone.maxJpy).toBeLessThanOrEqual(6_000_000);
+    }
+  });
+
+  it("retourne null si aucun prix testé dans la plage n'atteint le seuil", () => {
+    const input = baseInput({
+      prixAchatJpy: 4_000_000,
+      listing: {
+        ...EMPTY_LISTING,
+        constructionYear: 1965,
+        surfaceM2: 150,
+        condition: "major_renovation",
+      },
+    });
+    expect(computeInterestingZone(input, 9.5)).toBeNull();
   });
 });
 

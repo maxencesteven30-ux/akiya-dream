@@ -277,7 +277,8 @@ export function OpportunitySection({
 
           {/* 5. Prix cible / zone de négociation */}
           {(result.priceTargets.maxAffordablePriceJpy !== null ||
-            result.priceTargets.attractivePriceJpy !== null) && (
+            result.priceTargets.attractivePriceJpy !== null ||
+            result.priceTargets.interestingZone !== null) && (
             <Card className="border-border p-6 sm:p-8">
               <p className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 🎯 Zone de négociation
@@ -312,32 +313,62 @@ export function OpportunitySection({
                 </p>
               )}
 
+              {result.priceTargets.interestingZone && (
+                <div className="mt-4 rounded-md border border-primary/40 bg-accent/30 p-3 text-sm">
+                  <p className="font-medium text-foreground">🎯 Zone intéressante</p>
+                  <p className="text-muted-foreground">
+                    {formatJpy(result.priceTargets.interestingZone.minJpy)} –{" "}
+                    {formatJpy(result.priceTargets.interestingZone.maxJpy)}
+                  </p>
+                </div>
+              )}
+
               {result.sensitivity.length > 0 && (
                 <>
                   <Separator className="my-4" />
                   <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Si le prix change...
                   </p>
-                  <div className="space-y-1.5">
-                    {result.sensitivity.map((point) => (
-                      <div key={point.prixJpy} className="flex items-center gap-3 text-sm">
-                        <span className="w-32 shrink-0 leading-tight text-muted-foreground">
-                          <span className="block">{formatJpy(point.prixJpy)}</span>
-                          <span className="block text-xs">
-                            ≈ {formatEur(jpyToEur(point.prixJpy))}
-                          </span>
-                        </span>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
-                          <div
-                            className="h-full rounded-full bg-primary"
-                            style={{ width: `${point.score * 10}%` }}
-                          />
-                        </div>
-                        <span className="w-12 shrink-0 text-right font-medium text-foreground">
-                          {point.score.toFixed(1)}
-                        </span>
-                      </div>
-                    ))}
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[420px] text-sm">
+                      <thead>
+                        <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                          <th className="pb-2 font-medium">Prix</th>
+                          <th className="pb-2 font-medium">Note</th>
+                          <th className="pb-2 text-right font-medium">Projet total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.sensitivity.map((point) => {
+                          const inZone =
+                            result.priceTargets.interestingZone &&
+                            point.prixJpy >= result.priceTargets.interestingZone.minJpy &&
+                            point.prixJpy <= result.priceTargets.interestingZone.maxJpy;
+                          return (
+                            <tr
+                              key={point.prixJpy}
+                              className={`border-t border-border ${inZone ? "bg-primary/5" : ""}`}
+                            >
+                              <td className="py-1.5 leading-tight text-foreground">
+                                {formatJpy(point.prixJpy)}
+                                <span className="block text-xs text-muted-foreground">
+                                  ≈ {formatEur(jpyToEur(point.prixJpy))}
+                                </span>
+                              </td>
+                              <td className="py-1.5 font-medium text-foreground">
+                                {point.score.toFixed(1)}
+                              </td>
+                              <td className="py-1.5 text-right leading-tight text-foreground">
+                                {formatJpy(point.totalProjetJpy)}
+                                <span className="block text-xs text-muted-foreground">
+                                  ≈ {formatEur(point.totalProjetEur)}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </>
               )}

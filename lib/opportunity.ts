@@ -356,10 +356,51 @@ export function computePriceSensitivity(
     seen.add(priceJpy);
 
     const result = computeOpportunityScoreCore({ ...input, prixAchatJpy: priceJpy });
-    points.push({ prixJpy: priceJpy, score: result.score, category: result.category });
+    points.push({
+      prixJpy: priceJpy,
+      score: result.score,
+      category: result.category,
+      totalProjetJpy: result.budget.totalProjetJpy,
+      totalProjetEur: result.budget.totalProjetEur,
+    });
   }
 
   return points.sort((a, b) => a.prixJpy - b.prixJpy);
+}
+
+// Plage de prix ("zone intéressante") où la note atteint le seuil visé, en
+// ne recommandant jamais de payer plus que le prix demandé actuel. Comme
+// pour findAttractivePrice, on rejoue le moteur réel sur une grille — pas
+// d'inversion algébrique sur une fonction non garantie monotone.
+const ZONE_SCAN_STEP_JPY = 100_000;
+
+export interface InterestingZone {
+  minJpy: number;
+  maxJpy: number;
+}
+
+export function computeInterestingZone(
+  input: OpportunityInput,
+  targetScore: number = ATTRACTIVE_PRICE_TARGET_SCORE,
+  stepJpy: number = ZONE_SCAN_STEP_JPY,
+  minRatio: number = ATTRACTIVE_PRICE_MIN_RATIO,
+): InterestingZone | null {
+  const floorJpy = Math.max(SENSITIVITY_PRICE_FLOOR_JPY, input.prixAchatJpy * minRatio);
+  const ceilingJpy = input.prixAchatJpy;
+
+  let minJpy: number | null = null;
+  let maxJpy: number | null = null;
+
+  for (let price = floorJpy; price <= ceilingJpy; price += stepJpy) {
+    const result = computeOpportunityScoreCore({ ...input, prixAchatJpy: price });
+    if (result.score >= targetScore) {
+      if (minJpy === null) minJpy = price;
+      maxJpy = price;
+    }
+  }
+
+  if (minJpy === null || maxJpy === null) return null;
+  return { minJpy, maxJpy };
 }
 
 const ATTRACTIVE_PRICE_TARGET_SCORE = 7; // seuil "bonne opportunité" (catégorie ≥ bonne)
@@ -432,12 +473,15 @@ export interface PriceSensitivityPoint {
   prixJpy: number;
   score: number;
   category: OpportunityCategory;
+  totalProjetJpy: number;
+  totalProjetEur: number;
 }
 
 export interface PriceTargets {
   maxAffordablePriceJpy: number | null;
   attractivePriceJpy: number | null;
   negotiationMessage: string | null;
+  interestingZone: InterestingZone | null;
 }
 
 export interface OpportunityResult {
@@ -588,6 +632,7 @@ export function computeOpportunityScore(input: OpportunityInput): OpportunityRes
 
   const attractivePriceJpy = findAttractivePrice(input);
   const negotiationMessage = buildNegotiationMessage(input.prixAchatJpy, attractivePriceJpy);
+  const interestingZone = computeInterestingZone(input);
 
   return {
     ...core,
@@ -595,6 +640,7 @@ export function computeOpportunityScore(input: OpportunityInput): OpportunityRes
       maxAffordablePriceJpy,
       attractivePriceJpy,
       negotiationMessage,
+      interestingZone,
     },
     sensitivity,
   };
