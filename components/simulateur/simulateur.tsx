@@ -18,6 +18,7 @@ import { RegionFinder } from "@/components/simulateur/region-finder";
 import { JapanMap } from "@/components/simulateur/japan-map";
 import { RealListingSection } from "@/components/simulateur/real-listing-section";
 import { HiddenCostsSection } from "@/components/simulateur/hidden-costs-section";
+import { DueDiligenceSection } from "@/components/simulateur/due-diligence-section";
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
@@ -28,9 +29,11 @@ import { computeBudget, computeBudgetScenarios } from "@/lib/calculations";
 import { compareProperties } from "@/lib/comparison";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import { computeOpportunityScore } from "@/lib/opportunity";
+import { createEmptyChecklist } from "@/lib/due-diligence";
 import type {
   AccompanimentLevel,
   BuyerProfile,
+  ChecklistStatus,
   HiddenCostsSelection,
   NewProjectInput,
   PersistedProject,
@@ -71,6 +74,7 @@ const DEFAULT_STATE: SimulatorState = {
   // ordures) : coché par défaut dans l'UI, mais le moteur de calcul reste
   // lui-même opt-in (défaut false) pour ne rien changer silencieusement.
   includeNeighborhoodAssociation: true,
+  dueDiligence: createEmptyChecklist(),
 };
 
 export function Simulateur() {
@@ -220,6 +224,11 @@ export function Simulateur() {
     setState((prev) => ({ ...prev, snowyRegion }));
   const setIncludeNeighborhoodAssociation = (includeNeighborhoodAssociation: boolean) =>
     setState((prev) => ({ ...prev, includeNeighborhoodAssociation }));
+  const setDueDiligenceItem = (itemId: string, status: ChecklistStatus) =>
+    setState((prev) => ({
+      ...prev,
+      dueDiligence: { ...prev.dueDiligence, [itemId]: status },
+    }));
 
   const addToComparateur = () => {
     if (!state.profile || !state.renovationLevel) return;
@@ -283,6 +292,10 @@ export function Simulateur() {
       hiddenCosts: prev.hiddenCosts,
       snowyRegion: prev.snowyRegion,
       includeNeighborhoodAssociation: prev.includeNeighborhoodAssociation,
+      // La checklist de vérification concerne un bien physique précis :
+      // charger un autre projet repart d'un dossier vierge plutôt que de
+      // conserver par erreur des vérifications faites sur un autre bien.
+      dueDiligence: createEmptyChecklist(),
     }));
   };
 
@@ -353,6 +366,9 @@ export function Simulateur() {
               includeNeighborhoodAssociation={state.includeNeighborhoodAssociation}
               onIncludeNeighborhoodAssociationChange={setIncludeNeighborhoodAssociation}
             />
+            {state.realListing && (
+              <DueDiligenceSection state={state.dueDiligence} onChange={setDueDiligenceItem} />
+            )}
           </>
         )}
       </AnimatePresence>

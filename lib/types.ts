@@ -83,6 +83,15 @@ export interface HiddenCostsSelection {
   backTaxesNegotiation: boolean;
 }
 
+export type ChecklistStatus = "a_verifier" | "verifie" | "probleme" | "non_applicable";
+export type ChecklistCategory = "batiment" | "juridique" | "terrain" | "vie_locale";
+
+// Statut par élément de la checklist, indexé par identifiant d'élément
+// (cf. lib/due-diligence.ts pour la liste de référence). Un élément absent
+// de cet objet est considéré "à vérifier" (jamais un statut positif par
+// défaut).
+export type DueDiligenceState = Record<string, ChecklistStatus>;
+
 export interface SimulatorState {
   profile: BuyerProfile | null;
   housePriceJpy: number;
@@ -96,6 +105,7 @@ export interface SimulatorState {
   hiddenCosts: HiddenCostsSelection;
   snowyRegion: boolean;
   includeNeighborhoodAssociation: boolean;
+  dueDiligence: DueDiligenceState;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";
