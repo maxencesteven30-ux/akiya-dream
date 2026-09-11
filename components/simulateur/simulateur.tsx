@@ -9,10 +9,9 @@ import { ProfilSection } from "@/components/simulateur/profil-section";
 import { ProjetSection } from "@/components/simulateur/projet-section";
 import { ResultatSection } from "@/components/simulateur/resultat-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
-import { fetchSimulatorData } from "@/lib/data";
+import { fetchRegions } from "@/lib/data";
 import type {
   BuyerProfile,
-  CostsData,
   RenovationLevel,
   Region,
   SimulatorState,
@@ -28,7 +27,6 @@ const DEFAULT_STATE: SimulatorState = {
 export function Simulateur() {
   const [state, setState] = useState<SimulatorState>(DEFAULT_STATE);
   const [regions, setRegions] = useState<Region[]>([]);
-  const [costs, setCosts] = useState<CostsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -36,11 +34,10 @@ export function Simulateur() {
   useEffect(() => {
     let ignore = false;
 
-    fetchSimulatorData()
-      .then(({ regions, costs }) => {
+    fetchRegions()
+      .then((regions) => {
         if (ignore) return;
         setRegions(regions);
-        setCosts(costs);
       })
       .catch((err: unknown) => {
         if (ignore) return;
@@ -79,7 +76,7 @@ export function Simulateur() {
     return <SimulateurSkeleton />;
   }
 
-  if (error || !costs) {
+  if (error) {
     return (
       <div className="mx-auto max-w-4xl px-6 py-10">
         <div className="rounded-md border border-destructive/30 bg-destructive/5 p-6">

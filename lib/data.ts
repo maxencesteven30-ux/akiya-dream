@@ -161,11 +161,3 @@ export async function fetchCosts(): Promise<CostsData> {
 
   return { acquisition, renovation, annual };
 }
-
-export async function fetchSimulatorData(): Promise<{
-  regions: Region[];
-  costs: CostsData;
-}> {
-  const [regions, costs] = await Promise.all([fetchRegions(), fetchCosts()]);
-  return { regions, costs };
-}
