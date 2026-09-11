@@ -8,13 +8,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Money } from "@/components/simulateur/money";
 import { computeTotalSubsidies, getEligibleSubsidies } from "@/lib/subsidies";
+import type { Subsidy } from "@/lib/types";
 
 interface SubsidiesSectionProps {
   prefecture: string | null;
   onTotalChange?: (totalJpy: number) => void;
+  onEligibleChange?: (subsidies: Subsidy[]) => void;
 }
 
-export function SubsidiesSection({ prefecture, onTotalChange }: SubsidiesSectionProps) {
+export function SubsidiesSection({
+  prefecture,
+  onTotalChange,
+  onEligibleChange,
+}: SubsidiesSectionProps) {
   const [residenceCommitment, setResidenceCommitment] = useState(false);
   const [usesAkiyaBank, setUsesAkiyaBank] = useState(false);
 
@@ -32,6 +38,10 @@ export function SubsidiesSection({ prefecture, onTotalChange }: SubsidiesSection
   useEffect(() => {
     onTotalChange?.(total);
   }, [total, onTotalChange]);
+
+  useEffect(() => {
+    onEligibleChange?.(eligible);
+  }, [eligible, onEligibleChange]);
 
   if (!prefecture) return null;
 

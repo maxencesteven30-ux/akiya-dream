@@ -20,8 +20,12 @@ import { RealListingSection } from "@/components/simulateur/real-listing-section
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
+import { ExportSection } from "@/components/simulateur/export-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
+import { computeBudget, computeBudgetScenarios } from "@/lib/calculations";
+import { compareProperties } from "@/lib/comparison";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
+import { computeOpportunityScore } from "@/lib/opportunity";
 import type {
   AccompanimentLevel,
   BuyerProfile,
@@ -34,6 +38,7 @@ import type {
   Region,
   SavedProject,
   SimulatorState,
+  Subsidy,
 } from "@/lib/types";
 
 const MAX_SAVED_PROJECTS = 3;
@@ -74,6 +79,7 @@ export function Simulateur() {
     }
   });
   const [subsidiesJpy, setSubsidiesJpy] = useState(0);
+  const [eligibleSubsidies, setEligibleSubsidies] = useState<Subsidy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -321,7 +327,11 @@ export function Simulateur() {
             />
 
             <Separator />
-            <SubsidiesSection prefecture={state.prefecture} onTotalChange={setSubsidiesJpy} />
+            <SubsidiesSection
+              prefecture={state.prefecture}
+              onTotalChange={setSubsidiesJpy}
+              onEligibleChange={setEligibleSubsidies}
+            />
 
             {state.realListing && (
               <>
@@ -359,6 +369,65 @@ export function Simulateur() {
 
             <Separator />
             <Roadmap profile={state.profile} />
+
+            <Separator />
+            <ExportSection
+              reportData={{
+                propertyName:
+                  state.realListing?.name.trim() ||
+                  (state.prefecture ? state.prefecture.replace(/_/g, " ") : "Mon projet"),
+                prefecture: state.prefecture,
+                budget: computeBudget(
+                  state.housePriceJpy,
+                  state.profile,
+                  state.renovationLevel,
+                  state.realListing?.constructionYear && state.realListing?.surfaceM2
+                    ? {
+                        constructionYear: state.realListing.constructionYear,
+                        surfaceM2: state.realListing.surfaceM2,
+                      }
+                    : null,
+                  state.accompanimentLevel,
+                  state.needsTranslation,
+                ),
+                scenarios: computeBudgetScenarios(
+                  state.housePriceJpy,
+                  state.profile,
+                  state.renovationLevel,
+                  state.realListing?.constructionYear && state.realListing?.surfaceM2
+                    ? {
+                        constructionYear: state.realListing.constructionYear,
+                        surfaceM2: state.realListing.surfaceM2,
+                      }
+                    : null,
+                  subsidiesJpy,
+                  state.accompanimentLevel,
+                  state.needsTranslation,
+                ),
+                opportunity:
+                  state.realListing && state.prefecture
+                    ? computeOpportunityScore({
+                        prixAchatJpy: state.housePriceJpy,
+                        profile: state.profile,
+                        renovationLevel: state.renovationLevel,
+                        region: regions.find((r) => r.prefecture === state.prefecture) ?? null,
+                        listing: state.realListing,
+                        capitalDisponibleEur: state.capitalDisponibleEur,
+                        reserveSecuriteEur: state.reserveSecuriteEur,
+                      })
+                    : null,
+                subsidies: eligibleSubsidies,
+              }}
+              comparisonAvailable={savedProjects.length > 0}
+              comparisonData={compareProperties(
+                savedProjects.map((property) => ({
+                  property,
+                  region: regions.find((r) => r.prefecture === property.prefecture) ?? null,
+                  capitalDisponibleEur: state.capitalDisponibleEur,
+                  reserveSecuriteEur: state.reserveSecuriteEur,
+                })),
+              )}
+            />
           </>
         )}
       </AnimatePresence>
