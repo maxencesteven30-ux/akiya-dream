@@ -14,10 +14,12 @@ import {
 import { ResultatSection } from "@/components/simulateur/resultat-section";
 import { BudgetSection } from "@/components/simulateur/budget-section";
 import { ComparateurSection } from "@/components/simulateur/comparateur-section";
+import { RegionFinder } from "@/components/simulateur/region-finder";
 import { Roadmap } from "@/components/roadmap/roadmap";
-import { fetchRegions } from "@/lib/data";
+import { fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import type {
   BuyerProfile,
+  RegionAttributes,
   RenovationLevel,
   Region,
   SavedProject,
@@ -38,6 +40,7 @@ const DEFAULT_STATE: SimulatorState = {
 export function Simulateur() {
   const [state, setState] = useState<SimulatorState>(DEFAULT_STATE);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [regionAttributes, setRegionAttributes] = useState<Record<string, RegionAttributes>>({});
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +53,17 @@ export function Simulateur() {
       .then((regions) => {
         if (ignore) return;
         setRegions(regions);
+
+        fetchRegionAttributes()
+          .then((attributes) => {
+            if (!ignore) setRegionAttributes(attributes);
+          })
+          .catch((err: unknown) => {
+            // Le moteur de scoring régional est une amélioration, pas une
+            // fonctionnalité critique : son échec ne doit pas bloquer le
+            // reste du simulateur.
+            console.error("fetchRegionAttributes failed:", err);
+          });
       })
       .catch((err: unknown) => {
         if (ignore) return;
@@ -150,6 +164,13 @@ export function Simulateur() {
         {state.profile && (
           <>
             <Separator />
+            <RegionFinder
+              regions={regions}
+              regionAttributes={regionAttributes}
+              capitalDisponibleEur={state.capitalDisponibleEur}
+              reserveSecuriteEur={state.reserveSecuriteEur}
+              onSelectRegion={setPrefecture}
+            />
             <ProjetSection
               regions={regions}
               housePriceJpy={state.housePriceJpy}
