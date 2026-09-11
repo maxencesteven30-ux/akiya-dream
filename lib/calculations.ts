@@ -92,6 +92,71 @@ export function computeBudget(
   };
 }
 
+// L'estimation travaux de computeRenovationBudget() est l'hypothèse
+// "optimiste" (aucun dépassement). Réaliste et prudent appliquent une
+// marge de dépassement explicite, alignée sur l'exemple chiffré du
+// cahier des charges (8,0M -> 8,8M -> 9,6M, soit +0% / +10% / +20%).
+export type ScenarioLabel = "optimiste" | "realiste" | "prudent";
+
+const SCENARIO_MULTIPLIERS: Record<ScenarioLabel, number> = {
+  optimiste: 1.0,
+  realiste: 1.1,
+  prudent: 1.2,
+};
+
+export interface RenovationScenarios {
+  optimisteJpy: number;
+  realisteJpy: number;
+  prudentJpy: number;
+}
+
+export function computeRenovationScenarios(
+  niveauTravaux: RenovationLevel,
+): RenovationScenarios {
+  const base = computeRenovationBudget(niveauTravaux);
+  return {
+    optimisteJpy: base * SCENARIO_MULTIPLIERS.optimiste,
+    realisteJpy: base * SCENARIO_MULTIPLIERS.realiste,
+    prudentJpy: base * SCENARIO_MULTIPLIERS.prudent,
+  };
+}
+
+export interface BudgetScenario {
+  label: ScenarioLabel;
+  multiplier: number;
+  travauxJpy: number;
+  totalProjetJpy: number;
+  totalProjetEur: number;
+}
+
+export function computeBudgetScenarios(
+  prixAchatJpy: number,
+  profile: BuyerProfile,
+  niveauTravaux: RenovationLevel,
+): BudgetScenario[] {
+  const acquisitionFees = computeAcquisitionFees(prixAchatJpy, profile);
+  const totalAcquisitionJpy = prixAchatJpy + acquisitionFees.total;
+  const renovation = computeRenovationScenarios(niveauTravaux);
+
+  const travauxByLabel: Record<ScenarioLabel, number> = {
+    optimiste: renovation.optimisteJpy,
+    realiste: renovation.realisteJpy,
+    prudent: renovation.prudentJpy,
+  };
+
+  return (Object.keys(SCENARIO_MULTIPLIERS) as ScenarioLabel[]).map((label) => {
+    const travauxJpy = travauxByLabel[label];
+    const totalProjetJpy = totalAcquisitionJpy + travauxJpy;
+    return {
+      label,
+      multiplier: SCENARIO_MULTIPLIERS[label],
+      travauxJpy,
+      totalProjetJpy,
+      totalProjetEur: jpyToEur(totalProjetJpy),
+    };
+  });
+}
+
 const TAXABLE_VALUE_RATIO = 0.5;
 const PROPERTY_TAX_RATE = 0.014;
 const CITY_PLANNING_TAX_RATE = 0.003;

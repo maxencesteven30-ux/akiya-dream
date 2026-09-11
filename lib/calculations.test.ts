@@ -4,9 +4,11 @@ import {
   computeAcquisitionFees,
   computeAgencyFee,
   computeBudget,
+  computeBudgetScenarios,
   computeBudgetVerdict,
   computeLegalSetupFee,
   computeRenovationBudget,
+  computeRenovationScenarios,
   EUR_JPY_RATE,
 } from "@/lib/calculations";
 
@@ -127,5 +129,32 @@ describe("computeBudgetVerdict", () => {
     const verdict = computeBudgetVerdict(72_000, 65_000, 0);
     expect(verdict.margeEur).toBeCloseTo(-7_000, 6);
     expect(verdict.verdict).toBe("non_viable");
+  });
+});
+
+describe("computeRenovationScenarios", () => {
+  it("applique +0% / +10% / +20% sur l'estimation de base (exemple du cahier des charges)", () => {
+    // Travaux standard = 8 000 000 JPY -> optimiste 8,0M / réaliste 8,8M / prudent 9,6M
+    const scenarios = computeRenovationScenarios("standard");
+    expect(scenarios.optimisteJpy).toBe(8_000_000);
+    expect(scenarios.realisteJpy).toBeCloseTo(8_800_000, 6);
+    expect(scenarios.prudentJpy).toBeCloseTo(9_600_000, 6);
+  });
+});
+
+describe("computeBudgetScenarios", () => {
+  it("retourne 3 scénarios avec le même prix d'achat et les mêmes frais d'acquisition", () => {
+    const scenarios = computeBudgetScenarios(3_000_000, "solo", "standard");
+    expect(scenarios).toHaveLength(3);
+
+    const [optimiste, realiste, prudent] = scenarios;
+    expect(optimiste.label).toBe("optimiste");
+    expect(realiste.label).toBe("realiste");
+    expect(prudent.label).toBe("prudent");
+
+    // Seul le poste travaux varie entre scénarios : acquisition inchangée (615 000)
+    expect(optimiste.totalProjetJpy).toBeCloseTo(11_615_000, 6);
+    expect(realiste.totalProjetJpy).toBeCloseTo(12_415_000, 6); // +800 000
+    expect(prudent.totalProjetJpy).toBeCloseTo(13_215_000, 6); // +1 600 000
   });
 });

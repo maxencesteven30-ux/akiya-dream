@@ -21,7 +21,12 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { calculateAnnualCosts, computeBudget } from "@/lib/calculations";
+import {
+  calculateAnnualCosts,
+  computeBudget,
+  computeBudgetScenarios,
+} from "@/lib/calculations";
+import type { ScenarioLabel } from "@/lib/calculations";
 import { formatEur, formatJpy } from "@/lib/format";
 import type { BuyerProfile, Region, RenovationLevel } from "@/lib/types";
 
@@ -67,6 +72,11 @@ export function ResultatSection({
     if (!profile) return null;
     return calculateAnnualCosts(housePriceJpy, profile);
   }, [housePriceJpy, profile]);
+
+  const scenarios = useMemo(() => {
+    if (!profile || !renovationLevel) return null;
+    return computeBudgetScenarios(housePriceJpy, profile, renovationLevel);
+  }, [housePriceJpy, profile, renovationLevel]);
 
   return (
     <motion.section
@@ -139,6 +149,7 @@ export function ResultatSection({
             </ResponsiveContainer>
 
             <DetailBreakdown budget={budget} />
+            {scenarios && <ScenarioComparison scenarios={scenarios} />}
           </div>
         )}
       </Card>
@@ -288,6 +299,57 @@ function AnnualCostsCard({
         </AccordionItem>
       </Accordion>
     </Card>
+  );
+}
+
+const SCENARIO_LABELS: Record<ScenarioLabel, string> = {
+  optimiste: "Optimiste",
+  realiste: "Réaliste",
+  prudent: "Prudent",
+};
+
+function ScenarioComparison({
+  scenarios,
+}: {
+  scenarios: ReturnType<typeof computeBudgetScenarios>;
+}) {
+  return (
+    <div className="border-t border-border pt-4">
+      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Scénarios travaux
+      </p>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Le total ci-dessus utilise l&apos;hypothèse optimiste (aucun dépassement).
+        Réaliste et prudent appliquent une marge de dépassement sur les travaux
+        (+10% / +20%) — hypothèse explicite, pas une donnée mesurée.
+      </p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {scenarios.map((scenario) => (
+          <div
+            key={scenario.label}
+            className="rounded-md border border-border p-3 text-sm"
+          >
+            <p className="mb-1 flex items-baseline justify-between">
+              <span className="font-medium text-foreground">
+                {SCENARIO_LABELS[scenario.label]}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {scenario.multiplier === 1
+                  ? "base"
+                  : `+${Math.round((scenario.multiplier - 1) * 100)}%`}
+              </span>
+            </p>
+            <p className="text-muted-foreground">Travaux : {formatJpy(scenario.travauxJpy)}</p>
+            <p className="text-foreground">
+              Total : {formatJpy(scenario.totalProjetJpy)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              soit {formatEur(scenario.totalProjetEur)}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
