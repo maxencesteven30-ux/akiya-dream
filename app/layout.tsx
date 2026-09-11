@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { PwaRegister } from "@/components/pwa-register";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,7 +17,7 @@ export const metadata: Metadata = {
   title: "Akiya Dream — Simulateur d'achat de maison abandonnée au Japon",
   description:
     "Estimez le coût réel d'achat et de rénovation d'une Akiya au Japon : frais, taxes, travaux et feuille de route.",
-  manifest: "/manifest.json",
+  manifest: "/manifest.webmanifest",
   appleWebApp: {
     title: "Akiya Dream",
   },
@@ -28,7 +29,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="fr"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col antialiased tracking-tight">{children}</body>
+      <body className="min-h-full flex flex-col antialiased tracking-tight">
+        <PwaRegister />
+        {children}
+      </body>
     </html>
   );
 }

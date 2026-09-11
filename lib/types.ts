@@ -92,6 +92,15 @@ export type ChecklistCategory = "batiment" | "juridique" | "terrain" | "vie_loca
 // défaut).
 export type DueDiligenceState = Record<string, ChecklistStatus>;
 
+export type VisitStage = "avant" | "pendant" | "apres";
+
+// Un élément coché ("true") de la checklist de préparation/déroulement de
+// visite (cf. lib/visit-checklist.ts, Phase Q). Propre à un bien précis,
+// comme dueDiligence. Contrairement à DueDiligenceState (4 statuts), un
+// élément absent ou "false" signifie simplement "pas encore fait" : pas de
+// nuance nécessaire pour une checklist d'actions.
+export type VisitChecklistState = Record<string, boolean>;
+
 // Un point d'étape enregistré manuellement par l'utilisateur (cf.
 // lib/history.ts, Phase P). Propre à un bien précis, comme dueDiligence :
 // réinitialisé quand un autre projet est chargé.
@@ -130,6 +139,7 @@ export interface SimulatorState {
   // null tant qu'aucune sauvegarde n'a eu lieu. Les pièces jointes (Phase O)
   // ne peuvent être attachées qu'à un projet possédant un id.
   currentProjectId: number | null;
+  visitChecklist: VisitChecklistState;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

@@ -19,6 +19,7 @@ import { JapanMap } from "@/components/simulateur/japan-map";
 import { RealListingSection } from "@/components/simulateur/real-listing-section";
 import { HiddenCostsSection } from "@/components/simulateur/hidden-costs-section";
 import { DueDiligenceSection } from "@/components/simulateur/due-diligence-section";
+import { VisitChecklistSection } from "@/components/simulateur/visit-checklist-section";
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { HistorySection } from "@/components/simulateur/history-section";
 import { ProjectDashboardSection } from "@/components/simulateur/project-dashboard-section";
@@ -34,6 +35,7 @@ import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from
 import { computeOpportunityScore } from "@/lib/opportunity";
 import { computeCompletionSummary, createEmptyChecklist } from "@/lib/due-diligence";
 import { createHistoryEntry } from "@/lib/history";
+import { createEmptyVisitChecklist } from "@/lib/visit-checklist";
 import { EUR_JPY_RATE } from "@/lib/data";
 import type {
   AccompanimentLevel,
@@ -51,11 +53,21 @@ import type {
   SavedProject,
   SimulatorState,
   Subsidy,
+  VisitChecklistState,
 } from "@/lib/types";
 
 const MAX_SAVED_PROJECTS = 3;
 const COMPARISONS_STORAGE_KEY = "akiya-comparisons";
 const HISTORY_STORAGE_KEY = "akiya-history";
+const VISIT_CHECKLIST_STORAGE_KEY = "akiya-visit-checklist";
+// Brouillon de la session en cours (hors historique et checklist de
+// visite, qui ont leurs propres clés) : sans ça, un rechargement de la
+// page hors ligne (téléphone verrouillé puis rouvert sur place, cf. Phase Q)
+// reviendrait à l'étape 1 et masquerait la checklist de visite déjà remplie,
+// qui n'apparaît qu'une fois un bien réel renseigné.
+const SESSION_DRAFT_STORAGE_KEY = "akiya-session-draft";
+
+type SessionDraft = Omit<SimulatorState, "history" | "visitChecklist">;
 // Doit rester identique à la constante du même nom dans
 // app/partage/[token]/page.tsx.
 const PENDING_IMPORT_STORAGE_KEY = "akiya-import-project";
@@ -84,6 +96,7 @@ const DEFAULT_STATE: SimulatorState = {
   dueDiligence: createEmptyChecklist(),
   history: [],
   currentProjectId: null,
+  visitChecklist: createEmptyVisitChecklist(),
 };
 
 export function Simulateur() {
@@ -105,26 +118,53 @@ export function Simulateur() {
       console.error("Lecture de l'historique depuis localStorage impossible:", err);
     }
 
+    // Checklist de visite (Phase Q) : même logique, pensée pour survivre à
+    // une réouverture de l'application hors ligne sur place (cf. public/sw.js).
+    let visitChecklist: VisitChecklistState = createEmptyVisitChecklist();
+    try {
+      const rawVisit = window.localStorage.getItem(VISIT_CHECKLIST_STORAGE_KEY);
+      if (rawVisit) visitChecklist = JSON.parse(rawVisit) as VisitChecklistState;
+    } catch (err) {
+      console.error("Lecture de la checklist de visite depuis localStorage impossible:", err);
+    }
+
     try {
       const raw = window.localStorage.getItem(PENDING_IMPORT_STORAGE_KEY);
-      if (!raw) return { ...DEFAULT_STATE, history };
-      window.localStorage.removeItem(PENDING_IMPORT_STORAGE_KEY);
-      const project = JSON.parse(raw) as PersistedProject;
-      return {
-        ...DEFAULT_STATE,
-        profile: project.profile,
-        housePriceJpy: project.housePriceJpy,
-        prefecture: project.prefecture,
-        renovationLevel: project.renovationLevel,
-        capitalDisponibleEur: project.capitalDisponibleEur,
-        reserveSecuriteEur: project.reserveSecuriteEur,
-        realListing: project.realListing,
-        history,
-      };
+      if (raw) {
+        window.localStorage.removeItem(PENDING_IMPORT_STORAGE_KEY);
+        const project = JSON.parse(raw) as PersistedProject;
+        return {
+          ...DEFAULT_STATE,
+          profile: project.profile,
+          housePriceJpy: project.housePriceJpy,
+          prefecture: project.prefecture,
+          renovationLevel: project.renovationLevel,
+          capitalDisponibleEur: project.capitalDisponibleEur,
+          reserveSecuriteEur: project.reserveSecuriteEur,
+          realListing: project.realListing,
+          history,
+          visitChecklist,
+        };
+      }
     } catch (err) {
       console.error("Import du projet partagé impossible:", err);
-      return { ...DEFAULT_STATE, history };
+      return { ...DEFAULT_STATE, history, visitChecklist };
     }
+
+    // Brouillon de la session en cours (Phase Q) : restauré seulement si
+    // aucun import de projet partagé n'est en attente (priorité à une
+    // action explicite de l'utilisateur).
+    try {
+      const rawDraft = window.localStorage.getItem(SESSION_DRAFT_STORAGE_KEY);
+      if (rawDraft) {
+        const draft = JSON.parse(rawDraft) as SessionDraft;
+        return { ...DEFAULT_STATE, ...draft, history, visitChecklist };
+      }
+    } catch (err) {
+      console.error("Lecture du brouillon de session depuis localStorage impossible:", err);
+    }
+
+    return { ...DEFAULT_STATE, history, visitChecklist };
   });
   const [regions, setRegions] = useState<Region[]>([]);
   const [regionAttributes, setRegionAttributes] = useState<Record<string, RegionAttributes>>({});
@@ -167,6 +207,53 @@ export function Simulateur() {
       console.error("Écriture de l'historique dans localStorage impossible:", err);
     }
   }, [state.history]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(VISIT_CHECKLIST_STORAGE_KEY, JSON.stringify(state.visitChecklist));
+    } catch (err) {
+      console.error("Écriture de la checklist de visite dans localStorage impossible:", err);
+    }
+  }, [state.visitChecklist]);
+
+  useEffect(() => {
+    const draft: SessionDraft = {
+      profile: state.profile,
+      housePriceJpy: state.housePriceJpy,
+      prefecture: state.prefecture,
+      renovationLevel: state.renovationLevel,
+      capitalDisponibleEur: state.capitalDisponibleEur,
+      reserveSecuriteEur: state.reserveSecuriteEur,
+      realListing: state.realListing,
+      accompanimentLevel: state.accompanimentLevel,
+      needsTranslation: state.needsTranslation,
+      hiddenCosts: state.hiddenCosts,
+      snowyRegion: state.snowyRegion,
+      includeNeighborhoodAssociation: state.includeNeighborhoodAssociation,
+      dueDiligence: state.dueDiligence,
+      currentProjectId: state.currentProjectId,
+    };
+    try {
+      window.localStorage.setItem(SESSION_DRAFT_STORAGE_KEY, JSON.stringify(draft));
+    } catch (err) {
+      console.error("Écriture du brouillon de session dans localStorage impossible:", err);
+    }
+  }, [
+    state.profile,
+    state.housePriceJpy,
+    state.prefecture,
+    state.renovationLevel,
+    state.capitalDisponibleEur,
+    state.reserveSecuriteEur,
+    state.realListing,
+    state.accompanimentLevel,
+    state.needsTranslation,
+    state.hiddenCosts,
+    state.snowyRegion,
+    state.includeNeighborhoodAssociation,
+    state.dueDiligence,
+    state.currentProjectId,
+  ]);
 
   useEffect(() => {
     let ignore = false;
@@ -258,6 +345,11 @@ export function Simulateur() {
     setState((prev) => ({
       ...prev,
       dueDiligence: { ...prev.dueDiligence, [itemId]: status },
+    }));
+  const setVisitChecklistItem = (itemId: string, done: boolean) =>
+    setState((prev) => ({
+      ...prev,
+      visitChecklist: { ...prev.visitChecklist, [itemId]: done },
     }));
   const addHistoryCheckpoint = (
     travauxJpy: number,
@@ -371,6 +463,8 @@ export function Simulateur() {
       // sauvegardés", filtré par RLS) : les pièces jointes (Phase O)
       // peuvent s'y attacher directement.
       currentProjectId: project.id,
+      // Et la checklist de visite concerne, elle aussi, un bien précis.
+      visitChecklist: createEmptyVisitChecklist(),
     }));
   };
 
@@ -453,7 +547,10 @@ export function Simulateur() {
               onIncludeNeighborhoodAssociationChange={setIncludeNeighborhoodAssociation}
             />
             {state.realListing && (
-              <DueDiligenceSection state={state.dueDiligence} onChange={setDueDiligenceItem} />
+              <>
+                <DueDiligenceSection state={state.dueDiligence} onChange={setDueDiligenceItem} />
+                <VisitChecklistSection state={state.visitChecklist} onChange={setVisitChecklistItem} />
+              </>
             )}
           </>
         )}
