@@ -6,9 +6,24 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { computeEstimatedPriceFromSurface } from "@/lib/calculations";
 import { formatJpy } from "@/lib/format";
-import type { RealListing } from "@/lib/types";
+import type { ListingCondition, RealListing } from "@/lib/types";
+
+const CONDITION_OPTIONS: { value: ListingCondition; label: string }[] = [
+  { value: "unknown", label: "Non renseigné" },
+  { value: "good", label: "Bon état" },
+  { value: "fair", label: "État correct" },
+  { value: "needs_renovation", label: "Travaux à prévoir" },
+  { value: "major_renovation", label: "Rénovation lourde nécessaire" },
+];
 
 interface RealListingSectionProps {
   realListing: RealListing | null;
@@ -23,6 +38,7 @@ const EMPTY_LISTING: RealListing = {
   landM2: null,
   constructionYear: null,
   stationDistanceKm: null,
+  condition: "unknown",
 };
 
 function parseNumber(raw: string): number | null {
@@ -157,6 +173,30 @@ export function RealListingSection({
               value={listing.stationDistanceKm ?? ""}
               onChange={(e) => update({ stationDistanceKm: parseNumber(e.target.value) })}
             />
+          </div>
+          <div>
+            <Label htmlFor="listing-condition" className="mb-2 block">
+              État général
+            </Label>
+            <Select
+              value={listing.condition}
+              onValueChange={(v) => v && update({ condition: v as ListingCondition })}
+            >
+              <SelectTrigger id="listing-condition" className="w-full">
+                <SelectValue>
+                  {(value: ListingCondition) =>
+                    CONDITION_OPTIONS.find((o) => o.value === value)?.label ?? value
+                  }
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {CONDITION_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </div>
 

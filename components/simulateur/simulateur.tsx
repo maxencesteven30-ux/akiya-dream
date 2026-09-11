@@ -17,6 +17,7 @@ import { ComparateurSection } from "@/components/simulateur/comparateur-section"
 import { RegionFinder } from "@/components/simulateur/region-finder";
 import { JapanMap } from "@/components/simulateur/japan-map";
 import { RealListingSection } from "@/components/simulateur/real-listing-section";
+import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
@@ -272,6 +273,20 @@ export function Simulateur() {
               onReserveChange={setReserveSecuriteEur}
               realListing={state.realListing}
             />
+
+            {state.realListing && (
+              <>
+                <Separator />
+                <OpportunitySection
+                  prixAchatJpy={state.housePriceJpy}
+                  profile={state.profile}
+                  renovationLevel={state.renovationLevel}
+                  region={regions.find((r) => r.prefecture === state.prefecture) ?? null}
+                  realListing={state.realListing}
+                />
+              </>
+            )}
+
             <Separator />
             <div className="flex justify-end">
               <Button

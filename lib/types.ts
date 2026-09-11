@@ -57,6 +57,13 @@ export type BuyerProfile = "solo" | "duo" | "investisseur";
 
 export type RenovationLevel = "leger" | "standard" | "lourd";
 
+export type ListingCondition =
+  | "good"
+  | "fair"
+  | "needs_renovation"
+  | "major_renovation"
+  | "unknown";
+
 export interface RealListing {
   name: string;
   city: string;
@@ -64,6 +71,7 @@ export interface RealListing {
   landM2: number | null;
   constructionYear: number | null;
   stationDistanceKm: number | null;
+  condition: ListingCondition;
 }
 
 export interface SimulatorState {
