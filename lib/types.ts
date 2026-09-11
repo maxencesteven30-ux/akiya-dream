@@ -51,3 +51,11 @@ export interface SimulatorState {
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";
+
+export interface SavedProject {
+  id: string;
+  name: string;
+  profile: BuyerProfile;
+  housePriceJpy: number;
+  renovationLevel: RenovationLevel;
+}

@@ -13,14 +13,18 @@ import {
 } from "@/components/simulateur/projet-section";
 import { ResultatSection } from "@/components/simulateur/resultat-section";
 import { BudgetSection } from "@/components/simulateur/budget-section";
+import { ComparateurSection } from "@/components/simulateur/comparateur-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegions } from "@/lib/data";
 import type {
   BuyerProfile,
   RenovationLevel,
   Region,
+  SavedProject,
   SimulatorState,
 } from "@/lib/types";
+
+const MAX_SAVED_PROJECTS = 4;
 
 const DEFAULT_STATE: SimulatorState = {
   profile: null,
@@ -34,6 +38,7 @@ const DEFAULT_STATE: SimulatorState = {
 export function Simulateur() {
   const [state, setState] = useState<SimulatorState>(DEFAULT_STATE);
   const [regions, setRegions] = useState<Region[]>([]);
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
@@ -91,6 +96,33 @@ export function Simulateur() {
     setState((prev) => ({ ...prev, capitalDisponibleEur }));
   const setReserveSecuriteEur = (reserveSecuriteEur: number | null) =>
     setState((prev) => ({ ...prev, reserveSecuriteEur }));
+
+  const addToComparateur = () => {
+    if (!state.profile || !state.renovationLevel) return;
+
+    const baseName = state.prefecture ? state.prefecture.replace(/_/g, " ") : "Projet";
+    const existingNames = new Set(savedProjects.map((p) => p.name));
+    let name = baseName;
+    let suffix = 2;
+    while (existingNames.has(name)) {
+      name = `${baseName} (${suffix})`;
+      suffix += 1;
+    }
+
+    setSavedProjects((prev) => [
+      ...prev,
+      {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        name,
+        profile: state.profile!,
+        housePriceJpy: state.housePriceJpy,
+        renovationLevel: state.renovationLevel!,
+      },
+    ]);
+  };
+
+  const removeFromComparateur = (id: string) =>
+    setSavedProjects((prev) => prev.filter((p) => p.id !== id));
 
   if (loading) {
     return <SimulateurSkeleton />;
@@ -151,6 +183,24 @@ export function Simulateur() {
               reserveSecuriteEur={state.reserveSecuriteEur}
               onReserveChange={setReserveSecuriteEur}
             />
+            <Separator />
+            <div className="flex justify-end">
+              <Button
+                variant="outline"
+                onClick={addToComparateur}
+                disabled={savedProjects.length >= MAX_SAVED_PROJECTS}
+              >
+                + Ajouter au comparateur
+              </Button>
+            </div>
+
+            <ComparateurSection
+              projects={savedProjects}
+              onRemove={removeFromComparateur}
+              capitalDisponibleEur={state.capitalDisponibleEur}
+              reserveSecuriteEur={state.reserveSecuriteEur}
+            />
+
             <Separator />
             <Roadmap profile={state.profile} />
           </>
