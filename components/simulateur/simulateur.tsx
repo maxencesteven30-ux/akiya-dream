@@ -15,6 +15,7 @@ import { ResultatSection } from "@/components/simulateur/resultat-section";
 import { BudgetSection } from "@/components/simulateur/budget-section";
 import { ComparateurSection } from "@/components/simulateur/comparateur-section";
 import { RegionFinder } from "@/components/simulateur/region-finder";
+import { JapanMap } from "@/components/simulateur/japan-map";
 import { RealListingSection } from "@/components/simulateur/real-listing-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
@@ -190,6 +191,11 @@ export function Simulateur() {
               regionAttributes={regionAttributes}
               capitalDisponibleEur={state.capitalDisponibleEur}
               reserveSecuriteEur={state.reserveSecuriteEur}
+              onSelectRegion={setPrefecture}
+            />
+            <JapanMap
+              regions={regions}
+              regionAttributes={regionAttributes}
               onSelectRegion={setPrefecture}
             />
             <ProjetSection
