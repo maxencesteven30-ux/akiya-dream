@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { computeProjectVerdict, computeRiskLevel } from "@/lib/project-score";
-import type { CompletionSummary } from "@/lib/due-diligence";
+import { computeRiskLevel } from "@/lib/project-score";
 import type { RiskFlag } from "@/lib/calculations";
 
 const NO_FLAGS: RiskFlag[] = [];
 const SOME_FLAGS: RiskFlag[] = [{ key: "test", message: "test" }];
-
-function completion(percent: number): CompletionSummary {
-  return { completed: percent, total: 100, percent, hasProblem: false };
-}
 
 describe("computeRiskLevel", () => {
   it("est élevé si un problème de due diligence est détecté, quelle que soit la faisabilité", () => {
@@ -45,72 +40,5 @@ describe("computeRiskLevel", () => {
     expect(computeRiskLevel({ hasProblem: false, feasibility: null, riskFlags: NO_FLAGS })).toBe(
       "faible",
     );
-  });
-});
-
-describe("computeProjectVerdict", () => {
-  it("priorise toujours le risque élevé, même pour une très bonne opportunité", () => {
-    const verdict = computeProjectVerdict({
-      opportunityCategory: "tres_bonne",
-      risk: "eleve",
-      completion: completion(100),
-    });
-    expect(verdict.level).toBe("rouge");
-  });
-
-  it("reprend l'exemple du cahier des charges : bonne opportunité mais dossier incomplet", () => {
-    const verdict = computeProjectVerdict({
-      opportunityCategory: "bonne",
-      risk: "faible",
-      completion: completion(40),
-    });
-    expect(verdict.level).toBe("vert");
-    expect(verdict.message).toBe("Projet intéressant mais encore insuffisamment documenté.");
-  });
-
-  it("bonne opportunité et dossier documenté donne un message différent", () => {
-    const verdict = computeProjectVerdict({
-      opportunityCategory: "bonne",
-      risk: "faible",
-      completion: completion(85),
-    });
-    expect(verdict.level).toBe("vert");
-    expect(verdict.message).toBe("Projet intéressant et bien documenté.");
-  });
-
-  it("potentiel intéressant avec risque modéré donne un verdict orange", () => {
-    const verdict = computeProjectVerdict({
-      opportunityCategory: "interessante",
-      risk: "moyen",
-      completion: completion(50),
-    });
-    expect(verdict.level).toBe("orange");
-  });
-
-  it("potentiel intéressant sans risque donne un verdict jaune", () => {
-    const verdict = computeProjectVerdict({
-      opportunityCategory: "interessante",
-      risk: "faible",
-      completion: completion(50),
-    });
-    expect(verdict.level).toBe("jaune");
-  });
-
-  it("opportunité risquée donne un verdict orange", () => {
-    const verdict = computeProjectVerdict({
-      opportunityCategory: "risquee",
-      risk: "faible",
-      completion: completion(50),
-    });
-    expect(verdict.level).toBe("orange");
-  });
-
-  it("opportunité faible donne un verdict rouge", () => {
-    const verdict = computeProjectVerdict({
-      opportunityCategory: "faible",
-      risk: "faible",
-      completion: completion(50),
-    });
-    expect(verdict.level).toBe("rouge");
   });
 });

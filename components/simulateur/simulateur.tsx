@@ -22,7 +22,7 @@ import { DueDiligenceSection } from "@/components/simulateur/due-diligence-secti
 import { VisitChecklistSection } from "@/components/simulateur/visit-checklist-section";
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { HistorySection } from "@/components/simulateur/history-section";
-import { ProjectDashboardSection } from "@/components/simulateur/project-dashboard-section";
+import { DecisionCenterSection } from "@/components/simulateur/decision-center-section";
 import { DocumentsSection } from "@/components/simulateur/documents-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
@@ -37,6 +37,7 @@ import { computeCompletionSummary, createEmptyChecklist } from "@/lib/due-dilige
 import { createHistoryEntry } from "@/lib/history";
 import { createEmptyVisitChecklist } from "@/lib/visit-checklist";
 import { EUR_JPY_RATE } from "@/lib/data";
+import type { ProjectDocument } from "@/lib/documents";
 import type {
   AccompanimentLevel,
   BuyerProfile,
@@ -166,6 +167,10 @@ export function Simulateur() {
 
     return { ...DEFAULT_STATE, history, visitChecklist };
   });
+  // Documents (Phase O) : possédés par DocumentsSection (fetch/upload/
+  // suppression), mais remontés ici pour que le Centre de décision
+  // (Phase U) reflète les changements sans dupliquer l'appel réseau.
+  const [projectDocuments, setProjectDocuments] = useState<ProjectDocument[] | null>(null);
   const [regions, setRegions] = useState<Region[]>([]);
   const [regionAttributes, setRegionAttributes] = useState<Record<string, RegionAttributes>>({});
   const [regionAttributeDetails, setRegionAttributeDetails] = useState<
@@ -498,7 +503,10 @@ export function Simulateur() {
       />
 
       {state.currentProjectId !== null && (
-        <DocumentsSection projectId={state.currentProjectId} />
+        <DocumentsSection
+          projectId={state.currentProjectId}
+          onDocumentsChange={setProjectDocuments}
+        />
       )}
 
       <ProfilSection value={state.profile} onChange={setProfile} />
@@ -562,12 +570,20 @@ export function Simulateur() {
             {state.realListing && historyOpportunityResult && (
               <>
                 <Separator />
-                <ProjectDashboardSection
+                <DecisionCenterSection
+                  propertyName={
+                    state.realListing.name.trim() ||
+                    (state.prefecture ? state.prefecture.replace(/_/g, " ") : "Mon projet")
+                  }
                   opportunityScore={historyOpportunityResult.score}
                   opportunityCategory={historyOpportunityResult.category}
                   feasibility={historyOpportunityResult.feasibility}
                   riskFlags={historyOpportunityResult.riskFlags}
+                  budgetTotalJpy={historyOpportunityResult.budget.totalProjetJpy}
+                  dueDiligence={state.dueDiligence}
                   completion={computeCompletionSummary(state.dueDiligence)}
+                  visitChecklist={state.visitChecklist}
+                  documents={state.currentProjectId === null ? null : projectDocuments}
                 />
               </>
             )}

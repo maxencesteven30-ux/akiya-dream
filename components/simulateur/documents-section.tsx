@@ -26,6 +26,7 @@ import {
 
 interface DocumentsSectionProps {
   projectId: number;
+  onDocumentsChange?: (documents: ProjectDocument[]) => void;
 }
 
 const CATEGORY_OPTIONS: PieceCategory[] = [
@@ -42,8 +43,16 @@ function formatSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
 }
 
-export function DocumentsSection({ projectId }: DocumentsSectionProps) {
+export function DocumentsSection({ projectId, onDocumentsChange }: DocumentsSectionProps) {
   const [documents, setDocuments] = useState<ProjectDocument[]>([]);
+
+  useEffect(() => {
+    onDocumentsChange?.(documents);
+    // onDocumentsChange n'est volontairement pas dans les dépendances : ne
+    // notifier que sur un changement réel de la liste, pas à chaque
+    // rendu du composant parent (qui recrée la fonction à chaque fois).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [documents]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [category, setCategory] = useState<PieceCategory>("photo");
