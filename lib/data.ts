@@ -1,4 +1,4 @@
-import { supabase } from "@/lib/supabase";
+import { getSupabaseClient } from "@/lib/supabase";
 import type {
   AcquisitionCost,
   AnnualCost,
@@ -90,7 +90,7 @@ function mapAnnualRow(row: CostsAnnualRow): AnnualCost {
 
 export async function fetchRegions(): Promise<Region[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseClient()
       .from("regions")
       .select("*")
       .order("name", { ascending: true })
@@ -106,7 +106,7 @@ export async function fetchRegions(): Promise<Region[]> {
 
 export async function fetchAcquisitionCosts(): Promise<AcquisitionCost[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseClient()
       .from("costs_acquisition")
       .select("*")
       .order("id", { ascending: true })
@@ -122,7 +122,7 @@ export async function fetchAcquisitionCosts(): Promise<AcquisitionCost[]> {
 
 export async function fetchRenovationCosts(): Promise<RenovationCost[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseClient()
       .from("costs_renovation")
       .select("*")
       .order("id", { ascending: true })
@@ -138,7 +138,7 @@ export async function fetchRenovationCosts(): Promise<RenovationCost[]> {
 
 export async function fetchAnnualCosts(): Promise<AnnualCost[]> {
   try {
-    const { data, error } = await supabase
+    const { data, error } = await getSupabaseClient()
       .from("costs_annual")
       .select("*")
       .order("id", { ascending: true })
