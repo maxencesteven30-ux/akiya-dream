@@ -24,6 +24,7 @@ import { OpportunitySection } from "@/components/simulateur/opportunity-section"
 import { HistorySection } from "@/components/simulateur/history-section";
 import { DecisionCenterSection } from "@/components/simulateur/decision-center-section";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
+import { RemoteOwnerSection } from "@/components/simulateur/remote-owner-section";
 import { DocumentsSection } from "@/components/simulateur/documents-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
@@ -38,6 +39,7 @@ import { computeCompletionSummary, createEmptyChecklist } from "@/lib/due-dilige
 import { createHistoryEntry } from "@/lib/history";
 import { createEmptyVisitChecklist } from "@/lib/visit-checklist";
 import { createEmptyRealityGate, createEmptyRealityGateDocuments } from "@/lib/reality-gate";
+import { createEmptyRemoteOwnerProfile } from "@/lib/remote-owner";
 import { EUR_JPY_RATE } from "@/lib/data";
 import type { ProjectDocument } from "@/lib/documents";
 import type {
@@ -51,6 +53,7 @@ import type {
   PersistedProject,
   RealListing,
   RealityGateItemStatus,
+  RemoteOwnerProfile,
   RegionAttributeDetail,
   RegionAttributes,
   RenovationLevel,
@@ -105,6 +108,7 @@ const DEFAULT_STATE: SimulatorState = {
   realityGate: createEmptyRealityGate(),
   landNature: null,
   realityGateDocuments: createEmptyRealityGateDocuments(),
+  remoteOwner: createEmptyRemoteOwnerProfile(),
 };
 
 export function Simulateur() {
@@ -247,6 +251,7 @@ export function Simulateur() {
       realityGate: state.realityGate,
       landNature: state.landNature,
       realityGateDocuments: state.realityGateDocuments,
+      remoteOwner: state.remoteOwner,
     };
     try {
       window.localStorage.setItem(SESSION_DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -271,6 +276,7 @@ export function Simulateur() {
     state.realityGate,
     state.landNature,
     state.realityGateDocuments,
+    state.remoteOwner,
   ]);
 
   useEffect(() => {
@@ -380,6 +386,22 @@ export function Simulateur() {
     setState((prev) => ({
       ...prev,
       realityGateDocuments: { ...prev.realityGateDocuments, [docId]: available },
+    }));
+  const setRemoteOwnerField = <K extends keyof RemoteOwnerProfile>(
+    key: K,
+    value: RemoteOwnerProfile[K],
+  ) =>
+    setState((prev) => ({
+      ...prev,
+      remoteOwner: { ...prev.remoteOwner, [key]: value },
+    }));
+  const setNonResidentAdminItem = (itemId: string, done: boolean) =>
+    setState((prev) => ({
+      ...prev,
+      remoteOwner: {
+        ...prev.remoteOwner,
+        nonResidentAdmin: { ...prev.remoteOwner.nonResidentAdmin, [itemId]: done },
+      },
     }));
   const addHistoryCheckpoint = (
     travauxJpy: number,
@@ -500,6 +522,10 @@ export function Simulateur() {
       realityGate: createEmptyRealityGate(),
       landNature: null,
       realityGateDocuments: createEmptyRealityGateDocuments(),
+      // Le profil Remote Owner (Phase X) concerne l'usage prévu de ce bien
+      // précis (résidence secondaire, investissement...) : repart à zéro
+      // sur un autre projet, comme le reste du dossier.
+      remoteOwner: createEmptyRemoteOwnerProfile(),
     }));
   };
 
@@ -596,6 +622,11 @@ export function Simulateur() {
                 />
                 <DueDiligenceSection state={state.dueDiligence} onChange={setDueDiligenceItem} />
                 <VisitChecklistSection state={state.visitChecklist} onChange={setVisitChecklistItem} />
+                <RemoteOwnerSection
+                  profile={state.remoteOwner}
+                  onChange={setRemoteOwnerField}
+                  onAdminItemChange={setNonResidentAdminItem}
+                />
               </>
             )}
           </>

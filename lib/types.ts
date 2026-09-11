@@ -116,6 +116,50 @@ export type LandNature = "residentiel" | "forestier" | "agricole";
 // posséder. Un élément absent est considéré non disponible.
 export type RealityGateDocumentsState = Record<string, boolean>;
 
+// Phase X — Remote Owner ("que va me coûter cette maison si je ne vis pas
+// au Japon ?"). Toutes les valeurs sont null tant que non renseignées :
+// jamais de valeur positive par défaut (ex. jamais "gestion organisée"
+// tant que l'utilisateur n'a rien déclaré).
+export type ResidenceLocation = "hors_japon" | "au_japon";
+export type UsageFrequency =
+  | "toute_annee"
+  | "plusieurs_mois"
+  | "quelques_semaines"
+  | "occasionnel"
+  | "pas_avant_plusieurs_annees";
+export type VacancyDuration =
+  | "jamais"
+  | "quelques_semaines"
+  | "quelques_mois"
+  | "la_plupart_de_lannee"
+  | "en_permanence";
+export type CaretakerType = "moi" | "ami" | "voisin" | "agence" | "societe_locale" | "personne";
+export type CheckFrequency = "hebdomadaire" | "mensuelle" | "saisonniere" | "annuelle";
+export type OwnershipPurpose =
+  | "residence_principale"
+  | "residence_secondaire"
+  | "investissement"
+  | "vacante_travaux";
+export type OwnershipGoal = "pied_a_terre" | "future_residence" | "residence_actuelle" | "investissement";
+
+// X.4 — checklist administrative du propriétaire non-résident. Un élément
+// absent est considéré non traité (comme VisitChecklistState).
+export type NonResidentAdminState = Record<string, boolean>;
+
+export interface RemoteOwnerProfile {
+  residenceLocation: ResidenceLocation | null;
+  usageFrequency: UsageFrequency | null;
+  vacancyDuration: VacancyDuration | null;
+  caretaker: CaretakerType | null;
+  checkFrequency: CheckFrequency | null;
+  ownershipPurpose: OwnershipPurpose | null;
+  ownershipGoal: OwnershipGoal | null;
+  // true seulement si l'utilisateur confirme explicitement avoir un
+  // projet de statut de séjour compatible — jamais vrai par défaut.
+  visaPlanConfirmed: boolean;
+  nonResidentAdmin: NonResidentAdminState;
+}
+
 // Un point d'étape enregistré manuellement par l'utilisateur (cf.
 // lib/history.ts, Phase P). Propre à un bien précis, comme dueDiligence :
 // réinitialisé quand un autre projet est chargé.
@@ -158,6 +202,7 @@ export interface SimulatorState {
   realityGate: RealityGateState;
   landNature: LandNature | null;
   realityGateDocuments: RealityGateDocumentsState;
+  remoteOwner: RemoteOwnerProfile;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

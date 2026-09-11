@@ -5,6 +5,7 @@ import { PIECE_CATEGORY_LABELS, type PieceCategory, type ProjectDocument } from 
 import { computeVisitProgress, type VisitStageProgress } from "@/lib/visit-checklist";
 import {
   LAND_NATURE_PROBLEM_ACTION,
+  LAND_NATURE_UNCONFIRMED_ACTION,
   REALITY_GATE_PROBLEM_ACTIONS,
   REALITY_GATE_TEMPLATE,
   computeLandNatureSeverity,
@@ -189,7 +190,7 @@ export function computeNextAction(input: {
   }
 
   if (landSeverity === "a_confirmer") {
-    return { message: LAND_NATURE_PROBLEM_ACTION, reason: "Nature du terrain non confirmée" };
+    return { message: LAND_NATURE_UNCONFIRMED_ACTION, reason: "Nature du terrain non confirmée" };
   }
   const unconfirmedRealityItem = REALITY_GATE_TEMPLATE.find(
     (item) => (input.realityGate[item.id] ?? "a_confirmer") === "a_confirmer",

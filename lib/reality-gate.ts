@@ -198,3 +198,10 @@ export const REALITY_GATE_PROBLEM_ACTIONS: Record<string, string> = {
 
 export const LAND_NATURE_PROBLEM_ACTION =
   "Faire confirmer le statut agricole du terrain auprès de la commission agricole (nōgyō iinkai) avant toute offre.";
+
+// Distinct du message ci-dessus : ici la nature du terrain n'est pas
+// encore connue (pourrait être résidentiel, forestier ou agricole), pas
+// déjà confirmée agricole — le texte ne doit donc jamais présupposer une
+// restriction qui n'a pas encore été établie.
+export const LAND_NATURE_UNCONFIRMED_ACTION =
+  "Faire confirmer la nature juridique du terrain (résidentiel, forestier ou agricole) avant toute offre.";

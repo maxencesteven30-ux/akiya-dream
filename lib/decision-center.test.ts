@@ -225,6 +225,17 @@ describe("computeNextAction", () => {
     expect(action.reason).toBe("Nature du terrain non confirmée");
   });
 
+  it("le message pour une nature de terrain non confirmée ne présuppose pas un statut agricole déjà établi", () => {
+    const unconfirmedAction = computeNextAction({
+      ...baseInput,
+      landNature: null,
+      completion: { completed: 0, total: 29, percent: 0, hasProblem: false },
+    });
+    const agricoleAction = computeNextAction({ ...baseInput, landNature: "agricole" });
+    expect(unconfirmedAction.message).not.toMatch(/statut agricole/i);
+    expect(unconfirmedAction.message).not.toBe(agricoleAction.message);
+  });
+
   it("demande de confirmer un élément Reality Gate non confirmé, avant le dossier incomplet", () => {
     const action = computeNextAction({
       ...baseInput,
