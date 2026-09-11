@@ -298,6 +298,7 @@ interface ProjectRow {
   real_listing: RealListing | null;
   created_at: string;
   updated_at: string;
+  share_token: string | null;
 }
 
 function mapProjectRow(row: ProjectRow): PersistedProject {
@@ -313,6 +314,7 @@ function mapProjectRow(row: ProjectRow): PersistedProject {
     realListing: row.real_listing,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    shareToken: row.share_token,
   };
 }
 
@@ -388,5 +390,59 @@ export async function deleteProject(id: number): Promise<void> {
   } catch (error) {
     console.error("deleteProject failed:", error);
     throw new Error("Impossible de supprimer ce projet dans Supabase.");
+  }
+}
+
+// Partage par lien (pas par email : l'app utilise l'auth anonyme, sans
+// email associé, et aucun service d'envoi transactionnel n'existe dans ce
+// projet — cf. migration 005_project_sharing.sql). Le jeton est généré côté
+// client puis stocké via une simple mise à jour (déjà couverte par la
+// policy RLS "propriétaire uniquement" existante) ; la lecture d'un projet
+// partagé passe exclusivement par la fonction Postgres get_shared_project,
+// qui exige une correspondance exacte du jeton.
+export async function shareProject(id: number): Promise<string> {
+  try {
+    const token =
+      typeof crypto !== "undefined" && "randomUUID" in crypto
+        ? crypto.randomUUID()
+        : Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+    const { error } = await getSupabaseClient()
+      .from("projects")
+      .update({ share_token: token })
+      .eq("id", id);
+
+    if (error) throw error;
+    return token;
+  } catch (error) {
+    console.error("shareProject failed:", error);
+    throw new Error("Impossible de générer le lien de partage.");
+  }
+}
+
+export async function unshareProject(id: number): Promise<void> {
+  try {
+    const { error } = await getSupabaseClient()
+      .from("projects")
+      .update({ share_token: null })
+      .eq("id", id);
+    if (error) throw error;
+  } catch (error) {
+    console.error("unshareProject failed:", error);
+    throw new Error("Impossible d'arrêter le partage de ce projet.");
+  }
+}
+
+export async function getSharedProject(token: string): Promise<PersistedProject | null> {
+  try {
+    const { data, error } = await getSupabaseClient().rpc("get_shared_project", { token });
+
+    if (error) throw error;
+    const rows = (data ?? []) as ProjectRow[];
+    if (rows.length === 0) return null;
+    return mapProjectRow(rows[0]);
+  } catch (error) {
+    console.error("getSharedProject failed:", error);
+    throw new Error("Impossible de charger ce projet partagé.");
   }
 }

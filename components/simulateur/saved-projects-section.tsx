@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { deleteProject, fetchMyProjects, jpyToEur, saveProject } from "@/lib/data";
+import {
+  deleteProject,
+  fetchMyProjects,
+  jpyToEur,
+  saveProject,
+  shareProject,
+  unshareProject,
+} from "@/lib/data";
 import { formatEur, formatJpy } from "@/lib/format";
 import type { NewProjectInput, PersistedProject } from "@/lib/types";
 
@@ -26,6 +33,9 @@ export function SavedProjectsSection({ currentProject, onLoad }: SavedProjectsSe
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [sharingId, setSharingId] = useState<number | null>(null);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
 
   const loading = open && !loaded && !error;
 
@@ -62,6 +72,48 @@ export function SavedProjectsSection({ currentProject, onLoad }: SavedProjectsSe
         setSaveError(err instanceof Error ? err.message : "Erreur inconnue.");
       })
       .finally(() => setSaving(false));
+  };
+
+  const copyShareLink = (token: string, projectId: number) => {
+    const url = `${window.location.origin}/partage/${token}`;
+    navigator.clipboard
+      ?.writeText(url)
+      .then(() => {
+        setCopiedId(projectId);
+        setTimeout(() => setCopiedId((current) => (current === projectId ? null : current)), 2500);
+      })
+      .catch(() => {
+        setShareError("Lien généré mais impossible de le copier automatiquement : " + url);
+      });
+  };
+
+  const handleShare = (project: PersistedProject) => {
+    setShareError(null);
+    if (project.shareToken) {
+      copyShareLink(project.shareToken, project.id);
+      return;
+    }
+    setSharingId(project.id);
+    shareProject(project.id)
+      .then((token) => {
+        setProjects((prev) =>
+          prev.map((p) => (p.id === project.id ? { ...p, shareToken: token } : p)),
+        );
+        copyShareLink(token, project.id);
+      })
+      .catch((err: unknown) => {
+        setShareError(err instanceof Error ? err.message : "Erreur inconnue.");
+      })
+      .finally(() => setSharingId(null));
+  };
+
+  const handleUnshare = (project: PersistedProject) => {
+    setProjects((prev) =>
+      prev.map((p) => (p.id === project.id ? { ...p, shareToken: null } : p)),
+    );
+    unshareProject(project.id).catch((err: unknown) => {
+      console.error("Failed to unshare project:", err);
+    });
   };
 
   const handleDelete = (id: number) => {
@@ -132,10 +184,34 @@ export function SavedProjectsSection({ currentProject, onLoad }: SavedProjectsSe
                     {project.prefecture ? ` · ${project.prefecture.replace(/_/g, " ")}` : ""}
                   </p>
                 </div>
-                <div className="flex shrink-0 gap-2">
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
                   <Button size="sm" variant="outline" onClick={() => onLoad(project)}>
                     Charger
                   </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleShare(project)}
+                    disabled={sharingId === project.id}
+                  >
+                    {copiedId === project.id
+                      ? "Lien copié ✓"
+                      : sharingId === project.id
+                        ? "Génération..."
+                        : project.shareToken
+                          ? "🔗 Copier le lien"
+                          : "🔗 Partager"}
+                  </Button>
+                  {project.shareToken && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-muted-foreground"
+                      onClick={() => handleUnshare(project)}
+                    >
+                      Arrêter le partage
+                    </Button>
+                  )}
                   <Button
                     size="sm"
                     variant="ghost"
@@ -149,6 +225,7 @@ export function SavedProjectsSection({ currentProject, onLoad }: SavedProjectsSe
             ))}
           </ul>
         )}
+        {shareError && <p className="mt-3 text-xs text-destructive">{shareError}</p>}
       </Card>
     </motion.div>
   );

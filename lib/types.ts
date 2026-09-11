@@ -180,4 +180,5 @@ export interface PersistedProject extends NewProjectInput {
   id: number;
   createdAt: string;
   updatedAt: string;
+  shareToken: string | null;
 }

@@ -45,6 +45,9 @@ import type {
 
 const MAX_SAVED_PROJECTS = 3;
 const COMPARISONS_STORAGE_KEY = "akiya-comparisons";
+// Doit rester identique à la constante du même nom dans
+// app/partage/[token]/page.tsx.
+const PENDING_IMPORT_STORAGE_KEY = "akiya-import-project";
 
 const DEFAULT_STATE: SimulatorState = {
   profile: null,
@@ -70,7 +73,32 @@ const DEFAULT_STATE: SimulatorState = {
 };
 
 export function Simulateur() {
-  const [state, setState] = useState<SimulatorState>(DEFAULT_STATE);
+  // Lecture paresseuse (jamais dans un effet) d'un projet déposé par la page
+  // /partage/[token] ("Charger dans mon simulateur") : consommé une seule
+  // fois puis retiré, pour ne pas recharger le même projet à chaque
+  // rafraîchissement de la page d'accueil.
+  const [state, setState] = useState<SimulatorState>(() => {
+    if (typeof window === "undefined") return DEFAULT_STATE;
+    try {
+      const raw = window.localStorage.getItem(PENDING_IMPORT_STORAGE_KEY);
+      if (!raw) return DEFAULT_STATE;
+      window.localStorage.removeItem(PENDING_IMPORT_STORAGE_KEY);
+      const project = JSON.parse(raw) as PersistedProject;
+      return {
+        ...DEFAULT_STATE,
+        profile: project.profile,
+        housePriceJpy: project.housePriceJpy,
+        prefecture: project.prefecture,
+        renovationLevel: project.renovationLevel,
+        capitalDisponibleEur: project.capitalDisponibleEur,
+        reserveSecuriteEur: project.reserveSecuriteEur,
+        realListing: project.realListing,
+      };
+    } catch (err) {
+      console.error("Import du projet partagé impossible:", err);
+      return DEFAULT_STATE;
+    }
+  });
   const [regions, setRegions] = useState<Region[]>([]);
   const [regionAttributes, setRegionAttributes] = useState<Record<string, RegionAttributes>>({});
   const [regionAttributeDetails, setRegionAttributeDetails] = useState<
