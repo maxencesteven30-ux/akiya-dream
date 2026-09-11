@@ -16,7 +16,9 @@ import type {
   RenovationLevel,
 } from "@/lib/types";
 
-export const EUR_JPY_RATE = 179.09;
+// Taux indicatif, mis à jour manuellement (source : marché des changes,
+// cf. Investing.com/XE) — pas un flux temps réel.
+export const EUR_JPY_RATE = 179.27;
 
 export function jpyToEur(amountJpy: number): number {
   return amountJpy / EUR_JPY_RATE;

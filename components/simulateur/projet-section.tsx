@@ -14,7 +14,8 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { RegionCard } from "@/components/simulateur/region-card";
-import { formatJpy } from "@/lib/format";
+import { EUR_JPY_RATE, jpyToEur } from "@/lib/data";
+import { formatEur, formatJpy } from "@/lib/format";
 import type { Region, RegionAttributeDetail, RenovationLevel } from "@/lib/types";
 
 export const HOUSE_PRICE_MIN_JPY = 500_000;
@@ -67,8 +68,13 @@ export function ProjetSection({
       <div>
         <div className="mb-3 flex items-baseline justify-between">
           <Label>Prix d&apos;achat affiché</Label>
-          <span className="text-lg font-semibold text-primary">
-            {formatJpy(housePriceJpy)}
+          <span className="text-right">
+            <span className="block text-lg font-semibold text-primary">
+              {formatJpy(housePriceJpy)}
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              soit {formatEur(jpyToEur(housePriceJpy))} (1 € ≈ {EUR_JPY_RATE.toFixed(2)} ¥)
+            </span>
           </span>
         </div>
         <Slider
