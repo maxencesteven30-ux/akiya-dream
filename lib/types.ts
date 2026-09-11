@@ -101,6 +101,21 @@ export type VisitStage = "avant" | "pendant" | "apres";
 // nuance nécessaire pour une checklist d'actions.
 export type VisitChecklistState = Record<string, boolean>;
 
+// Phase V — Property Reality Gate ("ce bien est-il réellement achetable et
+// exploitable ?"). Statut déclaratif à 3 niveaux (pas de "non applicable" :
+// tout élément concerne toujours le bien) — un élément absent de l'état
+// est considéré "à confirmer" (jamais positif par défaut).
+export type RealityGateItemStatus = "verifie" | "a_confirmer" | "probleme";
+export type RealityGateState = Record<string, RealityGateItemStatus>;
+
+// Nature juridique du terrain (V.3) : null = non renseigné (traité comme
+// "à confirmer", jamais comme "résidentiel" par défaut).
+export type LandNature = "residentiel" | "forestier" | "agricole";
+
+// Documents officiels disponibles (V.5) : true = l'utilisateur déclare le
+// posséder. Un élément absent est considéré non disponible.
+export type RealityGateDocumentsState = Record<string, boolean>;
+
 // Un point d'étape enregistré manuellement par l'utilisateur (cf.
 // lib/history.ts, Phase P). Propre à un bien précis, comme dueDiligence :
 // réinitialisé quand un autre projet est chargé.
@@ -140,6 +155,9 @@ export interface SimulatorState {
   // ne peuvent être attachées qu'à un projet possédant un id.
   currentProjectId: number | null;
   visitChecklist: VisitChecklistState;
+  realityGate: RealityGateState;
+  landNature: LandNature | null;
+  realityGateDocuments: RealityGateDocumentsState;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

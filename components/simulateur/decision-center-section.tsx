@@ -18,8 +18,14 @@ import type { FeasibilityLevel, OpportunityCategory } from "@/lib/opportunity";
 import { computeRiskLevel, RISK_LEVEL_LABELS } from "@/lib/project-score";
 import { computeVisitProgress } from "@/lib/visit-checklist";
 import { CHECKLIST_TEMPLATE } from "@/lib/due-diligence";
+import {
+  LAND_NATURE_LABELS,
+  REALITY_GATE_TEMPLATE,
+  computeRealityGate,
+  getRealityGateMessage,
+} from "@/lib/reality-gate";
 import type { RiskFlag } from "@/lib/calculations";
-import type { DueDiligenceState, VisitChecklistState } from "@/lib/types";
+import type { DueDiligenceState, LandNature, RealityGateState, VisitChecklistState } from "@/lib/types";
 
 interface DecisionCenterSectionProps {
   propertyName: string;
@@ -31,6 +37,8 @@ interface DecisionCenterSectionProps {
   dueDiligence: DueDiligenceState;
   completion: CompletionSummary;
   visitChecklist: VisitChecklistState;
+  realityGate: RealityGateState;
+  landNature: LandNature | null;
   // null tant que le projet n'a pas été sauvegardé (Phase O) : les pièces
   // ne peuvent pas exister sans id de projet, ce n'est pas une estimation
   // à 0, juste une donnée indisponible pour l'instant.
@@ -53,19 +61,26 @@ export function DecisionCenterSection({
   dueDiligence,
   completion,
   visitChecklist,
+  realityGate,
+  landNature,
   documents,
 }: DecisionCenterSectionProps) {
   const visitStatus = computeVisitStatus(computeVisitProgress(visitChecklist));
   const risk = computeRiskLevel({ hasProblem: completion.hasProblem, feasibility, riskFlags });
+  const realityGateResult = computeRealityGate(realityGate, landNature);
   const decision = computeDecision({
+    realityGateLevel: realityGateResult.level,
     hasProblem: completion.hasProblem,
     feasibility,
     completion,
     visitStatus,
   });
-  const blockers = CHECKLIST_TEMPLATE.filter((item) => dueDiligence[item.id] === "probleme");
+  const dueDiligenceBlockers = CHECKLIST_TEMPLATE.filter((item) => dueDiligence[item.id] === "probleme");
+  const realityGateBlockers = REALITY_GATE_TEMPLATE.filter((item) => realityGate[item.id] === "probleme");
   const documentsCoverage = documents ? computeDocumentsCoverage(documents) : null;
   const nextAction = computeNextAction({
+    realityGate,
+    landNature,
     dueDiligence,
     completion,
     feasibility,
@@ -152,6 +167,18 @@ export function DecisionCenterSection({
           <p className="text-xs uppercase tracking-wide text-muted-foreground">🗓️ Visite</p>
           <p className="mt-2 text-sm font-medium text-foreground">{VISIT_STATUS_LABELS[visitStatus]}</p>
         </Card>
+
+        <Card className="border-border p-5 sm:col-span-2 lg:col-span-3">
+          <p className="text-xs uppercase tracking-wide text-muted-foreground">
+            🏗️ Reality Gate — ce bien est-il réellement achetable et exploitable ?
+          </p>
+          <p className="mt-2 text-sm font-medium text-foreground">
+            {getRealityGateMessage(realityGateResult)}
+          </p>
+          {landNature && (
+            <p className="mt-1 text-xs text-muted-foreground">{LAND_NATURE_LABELS[landNature]}</p>
+          )}
+        </Card>
       </div>
 
       <Card className={`mt-4 border p-6 ${DECISION_STYLES[decision.level]}`}>
@@ -160,13 +187,17 @@ export function DecisionCenterSection({
         </p>
         <p className="mt-1 text-lg font-medium text-foreground">{decision.label}</p>
 
-        {blockers.length > 0 && (
+        {(realityGateBlockers.length > 0 || landNature === "agricole" || dueDiligenceBlockers.length > 0) && (
           <div className="mt-4">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Blocages restants
             </p>
             <ul className="mt-1.5 space-y-1 text-sm text-foreground">
-              {blockers.map((item) => (
+              {landNature === "agricole" && <li>• Terrain agricole soumis à restrictions</li>}
+              {realityGateBlockers.map((item) => (
+                <li key={item.id}>• {item.label}</li>
+              ))}
+              {dueDiligenceBlockers.map((item) => (
                 <li key={item.id}>• {item.label}</li>
               ))}
             </ul>

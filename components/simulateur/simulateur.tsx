@@ -23,6 +23,7 @@ import { VisitChecklistSection } from "@/components/simulateur/visit-checklist-s
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { HistorySection } from "@/components/simulateur/history-section";
 import { DecisionCenterSection } from "@/components/simulateur/decision-center-section";
+import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
 import { DocumentsSection } from "@/components/simulateur/documents-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
@@ -36,6 +37,7 @@ import { computeOpportunityScore } from "@/lib/opportunity";
 import { computeCompletionSummary, createEmptyChecklist } from "@/lib/due-diligence";
 import { createHistoryEntry } from "@/lib/history";
 import { createEmptyVisitChecklist } from "@/lib/visit-checklist";
+import { createEmptyRealityGate, createEmptyRealityGateDocuments } from "@/lib/reality-gate";
 import { EUR_JPY_RATE } from "@/lib/data";
 import type { ProjectDocument } from "@/lib/documents";
 import type {
@@ -44,9 +46,11 @@ import type {
   ChecklistStatus,
   HiddenCostsSelection,
   HistoryEntry,
+  LandNature,
   NewProjectInput,
   PersistedProject,
   RealListing,
+  RealityGateItemStatus,
   RegionAttributeDetail,
   RegionAttributes,
   RenovationLevel,
@@ -98,6 +102,9 @@ const DEFAULT_STATE: SimulatorState = {
   history: [],
   currentProjectId: null,
   visitChecklist: createEmptyVisitChecklist(),
+  realityGate: createEmptyRealityGate(),
+  landNature: null,
+  realityGateDocuments: createEmptyRealityGateDocuments(),
 };
 
 export function Simulateur() {
@@ -237,6 +244,9 @@ export function Simulateur() {
       includeNeighborhoodAssociation: state.includeNeighborhoodAssociation,
       dueDiligence: state.dueDiligence,
       currentProjectId: state.currentProjectId,
+      realityGate: state.realityGate,
+      landNature: state.landNature,
+      realityGateDocuments: state.realityGateDocuments,
     };
     try {
       window.localStorage.setItem(SESSION_DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -258,6 +268,9 @@ export function Simulateur() {
     state.includeNeighborhoodAssociation,
     state.dueDiligence,
     state.currentProjectId,
+    state.realityGate,
+    state.landNature,
+    state.realityGateDocuments,
   ]);
 
   useEffect(() => {
@@ -355,6 +368,18 @@ export function Simulateur() {
     setState((prev) => ({
       ...prev,
       visitChecklist: { ...prev.visitChecklist, [itemId]: done },
+    }));
+  const setRealityGateItem = (itemId: string, status: RealityGateItemStatus) =>
+    setState((prev) => ({
+      ...prev,
+      realityGate: { ...prev.realityGate, [itemId]: status },
+    }));
+  const setLandNature = (landNature: LandNature | null) =>
+    setState((prev) => ({ ...prev, landNature }));
+  const setRealityGateDocument = (docId: string, available: boolean) =>
+    setState((prev) => ({
+      ...prev,
+      realityGateDocuments: { ...prev.realityGateDocuments, [docId]: available },
     }));
   const addHistoryCheckpoint = (
     travauxJpy: number,
@@ -470,6 +495,11 @@ export function Simulateur() {
       currentProjectId: project.id,
       // Et la checklist de visite concerne, elle aussi, un bien précis.
       visitChecklist: createEmptyVisitChecklist(),
+      // Le Property Reality Gate (Phase V) est propre au terrain de ce
+      // bien précis : repart à zéro sur un autre projet.
+      realityGate: createEmptyRealityGate(),
+      landNature: null,
+      realityGateDocuments: createEmptyRealityGateDocuments(),
     }));
   };
 
@@ -556,6 +586,14 @@ export function Simulateur() {
             />
             {state.realListing && (
               <>
+                <RealityGateSection
+                  state={state.realityGate}
+                  onChange={setRealityGateItem}
+                  landNature={state.landNature}
+                  onLandNatureChange={setLandNature}
+                  documents={state.realityGateDocuments}
+                  onDocumentsChange={setRealityGateDocument}
+                />
                 <DueDiligenceSection state={state.dueDiligence} onChange={setDueDiligenceItem} />
                 <VisitChecklistSection state={state.visitChecklist} onChange={setVisitChecklistItem} />
               </>
@@ -583,6 +621,8 @@ export function Simulateur() {
                   dueDiligence={state.dueDiligence}
                   completion={computeCompletionSummary(state.dueDiligence)}
                   visitChecklist={state.visitChecklist}
+                  realityGate={state.realityGate}
+                  landNature={state.landNature}
                   documents={state.currentProjectId === null ? null : projectDocuments}
                 />
               </>

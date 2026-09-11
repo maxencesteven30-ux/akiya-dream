@@ -3,7 +3,19 @@ import type { CompletionSummary } from "@/lib/due-diligence";
 import type { FeasibilityLevel } from "@/lib/opportunity";
 import { PIECE_CATEGORY_LABELS, type PieceCategory, type ProjectDocument } from "@/lib/documents";
 import { computeVisitProgress, type VisitStageProgress } from "@/lib/visit-checklist";
-import type { DueDiligenceState, VisitChecklistState } from "@/lib/types";
+import {
+  LAND_NATURE_PROBLEM_ACTION,
+  REALITY_GATE_PROBLEM_ACTIONS,
+  REALITY_GATE_TEMPLATE,
+  computeLandNatureSeverity,
+  type RealityGateLevel,
+} from "@/lib/reality-gate";
+import type {
+  DueDiligenceState,
+  LandNature,
+  RealityGateState,
+  VisitChecklistState,
+} from "@/lib/types";
 
 // Phase U — Centre de décision.
 //
@@ -66,21 +78,28 @@ export interface Decision {
 // les deux endroits qui jugent la complétude du dossier.
 const DOCUMENTED_THRESHOLD_PERCENT = 70;
 
-// Règle de gestion explicite : un problème avéré (due diligence ou
-// budget insuffisant) bloque toujours, quelle que soit la note
-// d'opportunité — comme pour le verdict global de la Phase S. Ensuite,
+// Règle de gestion explicite : le Property Reality Gate (Phase V) prime
+// toujours sur tout le reste — un blocage juridique/technique avéré (ou
+// même un simple doute non confirmé) ne doit jamais être masqué par une
+// bonne note d'opportunité ou un dossier par ailleurs complet. Ensuite, un
+// problème de due diligence ou un budget insuffisant bloque également ;
 // dossier incomplet ou visite non terminée maintiennent le projet en
 // "à vérifier" ; tout au vert donne le feu vert pour une offre.
 export function computeDecision(input: {
+  realityGateLevel: RealityGateLevel;
   hasProblem: boolean;
   feasibility: FeasibilityLevel | null;
   completion: CompletionSummary;
   visitStatus: VisitStatus;
 }): Decision {
-  if (input.hasProblem || input.feasibility === "insuffisant") {
+  if (input.realityGateLevel === "rouge" || input.hasProblem || input.feasibility === "insuffisant") {
     return { level: "bloque", label: "🔴 Ne pas avancer avant résolution des points bloquants" };
   }
-  if (input.completion.percent < DOCUMENTED_THRESHOLD_PERCENT || input.visitStatus !== "terminee") {
+  if (
+    input.realityGateLevel === "orange" ||
+    input.completion.percent < DOCUMENTED_THRESHOLD_PERCENT ||
+    input.visitStatus !== "terminee"
+  ) {
     return { level: "verifications", label: "🟠 Continuer les vérifications" };
   }
   return { level: "pret", label: "🟢 Projet prêt pour une offre" };
@@ -127,15 +146,40 @@ export interface NextAction {
 }
 
 // Priorité déterministe et fixe (jamais un classement appris) : un
-// blocage avéré prime toujours, puis le dossier, puis le budget, puis la
-// visite, puis les pièces — dans cet ordre, sans exception.
+// blocage juridique/technique avéré (terrain agricole, élément Reality
+// Gate confirmé "problème") prime sur tout le reste — y compris sur un
+// problème de due diligence, car un bien juridiquement bloqué n'a pas
+// besoin d'être négocié ou rénové. Vient ensuite un doute non confirmé
+// (terrain non classé/forestier, élément Reality Gate encore "à
+// confirmer") — plus fondamental qu'un dossier de due diligence
+// incomplet, car il peut invalider le projet entièrement. Puis : due
+// diligence, budget, visite, pièces — dans cet ordre, sans exception.
 export function computeNextAction(input: {
+  realityGate: RealityGateState;
+  landNature: LandNature | null;
   dueDiligence: DueDiligenceState;
   completion: CompletionSummary;
   feasibility: FeasibilityLevel | null;
   visitStatus: VisitStatus;
   documentsCount: number;
 }): NextAction {
+  const landSeverity = computeLandNatureSeverity(input.landNature);
+  if (landSeverity === "probleme") {
+    return { message: LAND_NATURE_PROBLEM_ACTION, reason: "Terrain agricole soumis à restrictions" };
+  }
+
+  const blockingRealityItem = REALITY_GATE_TEMPLATE.find(
+    (item) => input.realityGate[item.id] === "probleme",
+  );
+  if (blockingRealityItem) {
+    return {
+      message:
+        REALITY_GATE_PROBLEM_ACTIONS[blockingRealityItem.id] ??
+        `Résoudre le point bloquant : ${blockingRealityItem.label}.`,
+      reason: `Problème identifié (Reality Gate) : ${blockingRealityItem.label}`,
+    };
+  }
+
   const problemItem = CHECKLIST_TEMPLATE.find((item) => input.dueDiligence[item.id] === "probleme");
   if (problemItem) {
     return {
@@ -143,6 +187,22 @@ export function computeNextAction(input: {
       reason: `Problème détecté : ${problemItem.label}`,
     };
   }
+
+  if (landSeverity === "a_confirmer") {
+    return { message: LAND_NATURE_PROBLEM_ACTION, reason: "Nature du terrain non confirmée" };
+  }
+  const unconfirmedRealityItem = REALITY_GATE_TEMPLATE.find(
+    (item) => (input.realityGate[item.id] ?? "a_confirmer") === "a_confirmer",
+  );
+  if (unconfirmedRealityItem) {
+    return {
+      message:
+        REALITY_GATE_PROBLEM_ACTIONS[unconfirmedRealityItem.id] ??
+        `Confirmer : ${unconfirmedRealityItem.label}.`,
+      reason: `À confirmer (Reality Gate) : ${unconfirmedRealityItem.label}`,
+    };
+  }
+
   if (input.completion.percent < DOCUMENTED_THRESHOLD_PERCENT) {
     return {
       message: `Poursuivre le dossier de due diligence (${input.completion.completed}/${input.completion.total} vérifiés).`,
