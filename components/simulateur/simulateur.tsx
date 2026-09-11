@@ -21,6 +21,7 @@ import { HiddenCostsSection } from "@/components/simulateur/hidden-costs-section
 import { DueDiligenceSection } from "@/components/simulateur/due-diligence-section";
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { HistorySection } from "@/components/simulateur/history-section";
+import { ProjectDashboardSection } from "@/components/simulateur/project-dashboard-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
 import { ExportSection } from "@/components/simulateur/export-section";
@@ -30,7 +31,7 @@ import { computeBudget, computeBudgetScenarios } from "@/lib/calculations";
 import { compareProperties } from "@/lib/comparison";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import { computeOpportunityScore } from "@/lib/opportunity";
-import { createEmptyChecklist } from "@/lib/due-diligence";
+import { computeCompletionSummary, createEmptyChecklist } from "@/lib/due-diligence";
 import { createHistoryEntry } from "@/lib/history";
 import { EUR_JPY_RATE } from "@/lib/data";
 import type {
@@ -444,6 +445,18 @@ export function Simulateur() {
       <AnimatePresence>
         {state.profile && state.prefecture && state.renovationLevel && (
           <>
+            {state.realListing && historyOpportunityResult && (
+              <>
+                <Separator />
+                <ProjectDashboardSection
+                  opportunityScore={historyOpportunityResult.score}
+                  opportunityCategory={historyOpportunityResult.category}
+                  feasibility={historyOpportunityResult.feasibility}
+                  riskFlags={historyOpportunityResult.riskFlags}
+                  completion={computeCompletionSummary(state.dueDiligence)}
+                />
+              </>
+            )}
             <Separator />
             <ResultatSection
               housePriceJpy={state.housePriceJpy}
