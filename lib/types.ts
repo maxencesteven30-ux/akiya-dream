@@ -92,6 +92,20 @@ export type ChecklistCategory = "batiment" | "juridique" | "terrain" | "vie_loca
 // défaut).
 export type DueDiligenceState = Record<string, ChecklistStatus>;
 
+// Un point d'étape enregistré manuellement par l'utilisateur (cf.
+// lib/history.ts, Phase P). Propre à un bien précis, comme dueDiligence :
+// réinitialisé quand un autre projet est chargé.
+export interface HistoryEntry {
+  id: string;
+  timestamp: string;
+  housePriceJpy: number;
+  travauxJpy: number;
+  eurJpyRate: number;
+  // null si la note d'opportunité n'a pas encore été calculée au moment
+  // du point d'étape (pas de bien réel renseigné, ou analyse non lancée).
+  opportunityScore: number | null;
+}
+
 export interface SimulatorState {
   profile: BuyerProfile | null;
   housePriceJpy: number;
@@ -106,6 +120,7 @@ export interface SimulatorState {
   snowyRegion: boolean;
   includeNeighborhoodAssociation: boolean;
   dueDiligence: DueDiligenceState;
+  history: HistoryEntry[];
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

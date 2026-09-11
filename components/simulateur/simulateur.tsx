@@ -20,6 +20,7 @@ import { RealListingSection } from "@/components/simulateur/real-listing-section
 import { HiddenCostsSection } from "@/components/simulateur/hidden-costs-section";
 import { DueDiligenceSection } from "@/components/simulateur/due-diligence-section";
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
+import { HistorySection } from "@/components/simulateur/history-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
 import { ExportSection } from "@/components/simulateur/export-section";
@@ -30,11 +31,14 @@ import { compareProperties } from "@/lib/comparison";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import { computeOpportunityScore } from "@/lib/opportunity";
 import { createEmptyChecklist } from "@/lib/due-diligence";
+import { createHistoryEntry } from "@/lib/history";
+import { EUR_JPY_RATE } from "@/lib/data";
 import type {
   AccompanimentLevel,
   BuyerProfile,
   ChecklistStatus,
   HiddenCostsSelection,
+  HistoryEntry,
   NewProjectInput,
   PersistedProject,
   RealListing,
@@ -49,6 +53,7 @@ import type {
 
 const MAX_SAVED_PROJECTS = 3;
 const COMPARISONS_STORAGE_KEY = "akiya-comparisons";
+const HISTORY_STORAGE_KEY = "akiya-history";
 // Doit rester identique à la constante du même nom dans
 // app/partage/[token]/page.tsx.
 const PENDING_IMPORT_STORAGE_KEY = "akiya-import-project";
@@ -75,6 +80,7 @@ const DEFAULT_STATE: SimulatorState = {
   // lui-même opt-in (défaut false) pour ne rien changer silencieusement.
   includeNeighborhoodAssociation: true,
   dueDiligence: createEmptyChecklist(),
+  history: [],
 };
 
 export function Simulateur() {
@@ -84,9 +90,21 @@ export function Simulateur() {
   // rafraîchissement de la page d'accueil.
   const [state, setState] = useState<SimulatorState>(() => {
     if (typeof window === "undefined") return DEFAULT_STATE;
+
+    // Historique des points d'étape : persistant localement (pas encore lié
+    // à Supabase, cf. lib/history.ts), lu une seule fois ici comme le reste
+    // de l'état initial paresseux.
+    let history: HistoryEntry[] = [];
+    try {
+      const rawHistory = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+      if (rawHistory) history = JSON.parse(rawHistory) as HistoryEntry[];
+    } catch (err) {
+      console.error("Lecture de l'historique depuis localStorage impossible:", err);
+    }
+
     try {
       const raw = window.localStorage.getItem(PENDING_IMPORT_STORAGE_KEY);
-      if (!raw) return DEFAULT_STATE;
+      if (!raw) return { ...DEFAULT_STATE, history };
       window.localStorage.removeItem(PENDING_IMPORT_STORAGE_KEY);
       const project = JSON.parse(raw) as PersistedProject;
       return {
@@ -98,10 +116,11 @@ export function Simulateur() {
         capitalDisponibleEur: project.capitalDisponibleEur,
         reserveSecuriteEur: project.reserveSecuriteEur,
         realListing: project.realListing,
+        history,
       };
     } catch (err) {
       console.error("Import du projet partagé impossible:", err);
-      return DEFAULT_STATE;
+      return { ...DEFAULT_STATE, history };
     }
   });
   const [regions, setRegions] = useState<Region[]>([]);
@@ -137,6 +156,14 @@ export function Simulateur() {
       console.error("Écriture du comparateur dans localStorage impossible:", err);
     }
   }, [savedProjects]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(state.history));
+    } catch (err) {
+      console.error("Écriture de l'historique dans localStorage impossible:", err);
+    }
+  }, [state.history]);
 
   useEffect(() => {
     let ignore = false;
@@ -229,6 +256,21 @@ export function Simulateur() {
       ...prev,
       dueDiligence: { ...prev.dueDiligence, [itemId]: status },
     }));
+  const addHistoryCheckpoint = (travauxJpy: number, opportunityScore: number | null) =>
+    setState((prev) => ({
+      ...prev,
+      history: [
+        ...prev.history,
+        createHistoryEntry({
+          housePriceJpy: prev.housePriceJpy,
+          travauxJpy,
+          eurJpyRate: EUR_JPY_RATE,
+          opportunityScore,
+        }),
+      ],
+    }));
+  const deleteHistoryEntry = (id: string) =>
+    setState((prev) => ({ ...prev, history: prev.history.filter((entry) => entry.id !== id) }));
 
   const addToComparateur = () => {
     if (!state.profile || !state.renovationLevel) return;
@@ -277,6 +319,22 @@ export function Simulateur() {
         }
       : null;
 
+  // Réutilisé par la section Historique (Phase P) pour capturer les
+  // travaux estimés et la note d'opportunité au moment du point d'étape,
+  // avec le même calcul que la section Opportunité elle-même.
+  const historyOpportunityResult =
+    state.realListing && state.profile && state.renovationLevel
+      ? computeOpportunityScore({
+          prixAchatJpy: state.housePriceJpy,
+          profile: state.profile,
+          renovationLevel: state.renovationLevel,
+          region: regions.find((r) => r.prefecture === state.prefecture) ?? null,
+          listing: state.realListing,
+          capitalDisponibleEur: state.capitalDisponibleEur,
+          reserveSecuriteEur: state.reserveSecuriteEur,
+        })
+      : null;
+
   const loadPersistedProject = (project: PersistedProject) => {
     setState((prev) => ({
       profile: project.profile,
@@ -296,6 +354,9 @@ export function Simulateur() {
       // charger un autre projet repart d'un dossier vierge plutôt que de
       // conserver par erreur des vérifications faites sur un autre bien.
       dueDiligence: createEmptyChecklist(),
+      // Même logique pour l'historique des hypothèses : celui d'un autre
+      // bien n'a pas de sens ici.
+      history: [],
     }));
   };
 
@@ -436,6 +497,20 @@ export function Simulateur() {
                   realListing={state.realListing}
                   capitalDisponibleEur={state.capitalDisponibleEur}
                   reserveSecuriteEur={state.reserveSecuriteEur}
+                />
+                <Separator />
+                <HistorySection
+                  entries={state.history}
+                  currentTravauxJpy={historyOpportunityResult?.budget.travauxJpy ?? 0}
+                  currentOpportunityScore={historyOpportunityResult?.score ?? null}
+                  eurJpyRate={EUR_JPY_RATE}
+                  onCheckpoint={() =>
+                    addHistoryCheckpoint(
+                      historyOpportunityResult?.budget.travauxJpy ?? 0,
+                      historyOpportunityResult?.score ?? null,
+                    )
+                  }
+                  onDelete={deleteHistoryEntry}
                 />
               </>
             )}
