@@ -1,29 +1,37 @@
 import { describe, expect, it } from "vitest";
-import { computeHistoryDiffs, createHistoryEntry } from "@/lib/history";
+import { computeHistoryDiffs, createHistoryEntry, findVisitComparison } from "@/lib/history";
 import type { HistoryEntry } from "@/lib/types";
 
 describe("createHistoryEntry", () => {
   it("capture les hypothèses fournies telles quelles", () => {
     const now = new Date("2026-09-11T10:00:00.000Z");
     const entry = createHistoryEntry(
-      { housePriceJpy: 3_500_000, travauxJpy: 5_600_000, eurJpyRate: 179.27, opportunityScore: 8.2 },
+      {
+        housePriceJpy: 3_500_000,
+        travauxJpy: 5_600_000,
+        totalProjetJpy: 9_800_000,
+        eurJpyRate: 179.27,
+        opportunityScore: 8.2,
+      },
       now,
     );
     expect(entry.housePriceJpy).toBe(3_500_000);
     expect(entry.travauxJpy).toBe(5_600_000);
+    expect(entry.totalProjetJpy).toBe(9_800_000);
     expect(entry.eurJpyRate).toBe(179.27);
     expect(entry.opportunityScore).toBe(8.2);
     expect(entry.timestamp).toBe(now.toISOString());
+    expect(entry.isPostVisit).toBe(false);
   });
 
   it("génère un identifiant unique à chaque appel", () => {
     const now = new Date("2026-09-11T10:00:00.000Z");
     const a = createHistoryEntry(
-      { housePriceJpy: 1, travauxJpy: 1, eurJpyRate: 1, opportunityScore: null },
+      { housePriceJpy: 1, travauxJpy: 1, totalProjetJpy: 1, eurJpyRate: 1, opportunityScore: null },
       now,
     );
     const b = createHistoryEntry(
-      { housePriceJpy: 1, travauxJpy: 1, eurJpyRate: 1, opportunityScore: null },
+      { housePriceJpy: 1, travauxJpy: 1, totalProjetJpy: 1, eurJpyRate: 1, opportunityScore: null },
       now,
     );
     expect(a.id).not.toBe(b.id);
@@ -33,10 +41,23 @@ describe("createHistoryEntry", () => {
     const entry = createHistoryEntry({
       housePriceJpy: 1,
       travauxJpy: 1,
+      totalProjetJpy: 1,
       eurJpyRate: 1,
       opportunityScore: null,
     });
     expect(entry.opportunityScore).toBeNull();
+  });
+
+  it("marque le point d'étape comme post-visite quand demandé", () => {
+    const entry = createHistoryEntry({
+      housePriceJpy: 1,
+      travauxJpy: 1,
+      totalProjetJpy: 1,
+      eurJpyRate: 1,
+      opportunityScore: null,
+      isPostVisit: true,
+    });
+    expect(entry.isPostVisit).toBe(true);
   });
 });
 
@@ -46,8 +67,10 @@ describe("computeHistoryDiffs", () => {
     timestamp: "2026-09-11T00:00:00.000Z",
     housePriceJpy: 3_500_000,
     travauxJpy: 5_600_000,
+    totalProjetJpy: 9_800_000,
     eurJpyRate: 179.27,
     opportunityScore: 8.2,
+    isPostVisit: false,
   };
 
   it("ne calcule aucun delta pour le tout premier point d'étape", () => {
@@ -95,5 +118,53 @@ describe("computeHistoryDiffs", () => {
 
   it("retourne un tableau vide pour un historique vide", () => {
     expect(computeHistoryDiffs([])).toEqual([]);
+  });
+});
+
+describe("findVisitComparison", () => {
+  const beforeVisit: HistoryEntry = {
+    id: "1",
+    timestamp: "2026-09-11T00:00:00.000Z",
+    housePriceJpy: 3_500_000,
+    travauxJpy: 5_600_000,
+    totalProjetJpy: 9_800_000,
+    eurJpyRate: 179.27,
+    opportunityScore: 8.2,
+    isPostVisit: false,
+  };
+  const afterVisit: HistoryEntry = {
+    ...beforeVisit,
+    id: "2",
+    timestamp: "2026-09-20T00:00:00.000Z",
+    travauxJpy: 8_300_000,
+    totalProjetJpy: 12_500_000,
+    opportunityScore: 6.1,
+    isPostVisit: true,
+  };
+
+  it("retourne null s'il n'existe aucun point d'étape post-visite", () => {
+    expect(findVisitComparison([beforeVisit])).toBeNull();
+  });
+
+  it("retourne null si le point post-visite est le tout premier (rien à comparer avant)", () => {
+    expect(findVisitComparison([{ ...beforeVisit, isPostVisit: true }])).toBeNull();
+  });
+
+  it("associe le point post-visite le plus récent à celui qui le précède immédiatement", () => {
+    const comparison = findVisitComparison([beforeVisit, afterVisit]);
+    expect(comparison?.before.id).toBe("1");
+    expect(comparison?.after.id).toBe("2");
+  });
+
+  it("ignore un point post-visite plus ancien si un point d'étape plus récent (non post-visite) a été ajouté depuis", () => {
+    const laterCheckpoint: HistoryEntry = {
+      ...beforeVisit,
+      id: "3",
+      timestamp: "2026-09-25T00:00:00.000Z",
+      isPostVisit: false,
+    };
+    const comparison = findVisitComparison([beforeVisit, afterVisit, laterCheckpoint]);
+    expect(comparison?.after.id).toBe("2");
+    expect(comparison?.before.id).toBe("1");
   });
 });

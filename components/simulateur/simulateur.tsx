@@ -256,7 +256,12 @@ export function Simulateur() {
       ...prev,
       dueDiligence: { ...prev.dueDiligence, [itemId]: status },
     }));
-  const addHistoryCheckpoint = (travauxJpy: number, opportunityScore: number | null) =>
+  const addHistoryCheckpoint = (
+    travauxJpy: number,
+    totalProjetJpy: number,
+    opportunityScore: number | null,
+    isPostVisit: boolean,
+  ) =>
     setState((prev) => ({
       ...prev,
       history: [
@@ -264,8 +269,10 @@ export function Simulateur() {
         createHistoryEntry({
           housePriceJpy: prev.housePriceJpy,
           travauxJpy,
+          totalProjetJpy,
           eurJpyRate: EUR_JPY_RATE,
           opportunityScore,
+          isPostVisit,
         }),
       ],
     }));
@@ -504,10 +511,12 @@ export function Simulateur() {
                   currentTravauxJpy={historyOpportunityResult?.budget.travauxJpy ?? 0}
                   currentOpportunityScore={historyOpportunityResult?.score ?? null}
                   eurJpyRate={EUR_JPY_RATE}
-                  onCheckpoint={() =>
+                  onCheckpoint={(isPostVisit) =>
                     addHistoryCheckpoint(
                       historyOpportunityResult?.budget.travauxJpy ?? 0,
+                      historyOpportunityResult?.budget.totalProjetJpy ?? 0,
                       historyOpportunityResult?.score ?? null,
+                      isPostVisit,
                     )
                   }
                   onDelete={deleteHistoryEntry}

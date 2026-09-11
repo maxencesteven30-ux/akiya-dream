@@ -1,9 +1,11 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { computeHistoryDiffs } from "@/lib/history";
+import { Checkbox } from "@/components/ui/checkbox";
+import { computeHistoryDiffs, findVisitComparison } from "@/lib/history";
 import { formatEur, formatJpy } from "@/lib/format";
 import type { HistoryEntry } from "@/lib/types";
 
@@ -12,7 +14,7 @@ interface HistorySectionProps {
   currentTravauxJpy: number;
   currentOpportunityScore: number | null;
   eurJpyRate: number;
-  onCheckpoint: () => void;
+  onCheckpoint: (isPostVisit: boolean) => void;
   onDelete: (id: string) => void;
 }
 
@@ -37,7 +39,9 @@ export function HistorySection({
   onCheckpoint,
   onDelete,
 }: HistorySectionProps) {
+  const [markAsVisit, setMarkAsVisit] = useState(false);
   const diffs = computeHistoryDiffs(entries);
+  const visitComparison = findVisitComparison(entries);
 
   return (
     <motion.section
@@ -54,15 +58,65 @@ export function HistorySection({
         Comment ton évaluation de ce bien a évolué dans le temps
       </p>
 
+      {visitComparison && (
+        <Card className="mb-6 border-primary/40 bg-accent/20 p-6 sm:p-8">
+          <p className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            🔍 Avant / Après visite
+          </p>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[420px] text-sm">
+              <thead>
+                <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                  <th className="pb-2 font-medium"></th>
+                  <th className="pb-2 font-medium">Avant la visite</th>
+                  <th className="pb-2 font-medium">Après la visite</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-border">
+                  <td className="py-1.5 text-muted-foreground">Travaux estimés</td>
+                  <td className="py-1.5 text-foreground">{formatJpy(visitComparison.before.travauxJpy)}</td>
+                  <td className="py-1.5 text-foreground">{formatJpy(visitComparison.after.travauxJpy)}</td>
+                </tr>
+                <tr className="border-t border-border">
+                  <td className="py-1.5 text-muted-foreground">Coût total du projet</td>
+                  <td className="py-1.5 text-foreground">{formatJpy(visitComparison.before.totalProjetJpy)}</td>
+                  <td className="py-1.5 text-foreground">{formatJpy(visitComparison.after.totalProjetJpy)}</td>
+                </tr>
+                <tr className="border-t border-border font-medium">
+                  <td className="py-1.5 text-muted-foreground">Note d&apos;opportunité</td>
+                  <td className="py-1.5 text-foreground">
+                    {visitComparison.before.opportunityScore !== null
+                      ? `${visitComparison.before.opportunityScore.toFixed(1)} / 10`
+                      : "—"}
+                  </td>
+                  <td className="py-1.5 text-foreground">
+                    {visitComparison.after.opportunityScore !== null
+                      ? `${visitComparison.after.opportunityScore.toFixed(1)} / 10`
+                      : "—"}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
       <Card className="border-border p-6 sm:p-8">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <p className="text-sm text-muted-foreground">
             Enregistre un point d&apos;étape pour garder une trace des hypothèses actuelles
             (prix, travaux, taux, note). Utile avant/après une visite ou une négociation.
           </p>
-          <Button size="sm" onClick={onCheckpoint}>
-            📌 Enregistrer un point d&apos;étape
-          </Button>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <Button size="sm" onClick={() => onCheckpoint(markAsVisit)}>
+              📌 Enregistrer un point d&apos;étape
+            </Button>
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+              <Checkbox checked={markAsVisit} onCheckedChange={(checked) => setMarkAsVisit(checked === true)} />
+              Après une visite du bien
+            </label>
+          </div>
         </div>
 
         {diffs.length === 0 ? (
@@ -77,6 +131,11 @@ export function HistorySection({
                   <div className="mb-2 flex items-start justify-between gap-3">
                     <p className="font-medium text-foreground">
                       {DATE_FORMATTER.format(new Date(entry.timestamp))}
+                      {entry.isPostVisit && (
+                        <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-normal text-primary">
+                          🔍 Après visite
+                        </span>
+                      )}
                     </p>
                     <Button
                       size="sm"

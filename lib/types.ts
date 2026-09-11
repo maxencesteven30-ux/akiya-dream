@@ -100,10 +100,15 @@ export interface HistoryEntry {
   timestamp: string;
   housePriceJpy: number;
   travauxJpy: number;
+  totalProjetJpy: number;
   eurJpyRate: number;
   // null si la note d'opportunité n'a pas encore été calculée au moment
   // du point d'étape (pas de bien réel renseigné, ou analyse non lancée).
   opportunityScore: number | null;
+  // true si ce point d'étape a été enregistré après une visite du bien
+  // (constats terrain pris en compte dans les hypothèses) — cf. Phase R,
+  // comparaison avant/après visite dans lib/history.ts.
+  isPostVisit: boolean;
 }
 
 export interface SimulatorState {

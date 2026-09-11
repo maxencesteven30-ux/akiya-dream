@@ -12,8 +12,10 @@ import type { HistoryEntry } from "@/lib/types";
 export interface NewHistoryEntryInput {
   housePriceJpy: number;
   travauxJpy: number;
+  totalProjetJpy: number;
   eurJpyRate: number;
   opportunityScore: number | null;
+  isPostVisit?: boolean;
 }
 
 export function createHistoryEntry(
@@ -25,8 +27,10 @@ export function createHistoryEntry(
     timestamp: now.toISOString(),
     housePriceJpy: input.housePriceJpy,
     travauxJpy: input.travauxJpy,
+    totalProjetJpy: input.totalProjetJpy,
     eurJpyRate: input.eurJpyRate,
     opportunityScore: input.opportunityScore,
+    isPostVisit: input.isPostVisit ?? false,
   };
 }
 
@@ -56,4 +60,26 @@ export function computeHistoryDiffs(entries: HistoryEntry[]): HistoryEntryWithDi
           : null,
     };
   });
+}
+
+// Phase R — Avant / Après visite.
+//
+// Réutilise l'historique de la Phase P plutôt qu'un mécanisme séparé :
+// une visite se traduit simplement par un point d'étape marqué
+// `isPostVisit`, comparé à celui qui le précède immédiatement dans le
+// temps (les hypothèses juste avant la visite). S'il n'y a pas de point
+// d'étape avant (la toute première visite est aussi le tout premier point
+// d'étape), aucune comparaison n'a de sens : retourne null.
+export interface VisitComparison {
+  before: HistoryEntry;
+  after: HistoryEntry;
+}
+
+export function findVisitComparison(entries: HistoryEntry[]): VisitComparison | null {
+  for (let i = entries.length - 1; i >= 0; i -= 1) {
+    if (entries[i].isPostVisit && i > 0) {
+      return { before: entries[i - 1], after: entries[i] };
+    }
+  }
+  return null;
 }
