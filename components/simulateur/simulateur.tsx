@@ -241,7 +241,11 @@ export function Simulateur() {
               renovationLevel={state.renovationLevel}
               onRenovationLevelChange={setRenovationLevel}
             />
-            <RealListingSection realListing={state.realListing} onChange={setRealListing} />
+            <RealListingSection
+              realListing={state.realListing}
+              onChange={setRealListing}
+              onApplyEstimatedPrice={setHousePriceJpy}
+            />
           </>
         )}
       </AnimatePresence>
@@ -266,6 +270,7 @@ export function Simulateur() {
               onCapitalChange={setCapitalDisponibleEur}
               reserveSecuriteEur={state.reserveSecuriteEur}
               onReserveChange={setReserveSecuriteEur}
+              realListing={state.realListing}
             />
             <Separator />
             <div className="flex justify-end">

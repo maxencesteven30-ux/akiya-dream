@@ -1,5 +1,21 @@
 export type RecommendationLevel = "A" | "B" | "C";
 
+export type BuildingEraCode = "PRE_1981" | "POST_1981" | "POST_2000";
+
+export interface BuildingEra {
+  code: BuildingEraCode;
+  yearRangeLabel: string;
+  seismicStandard: string;
+  insulationStandard: string;
+  asbestosStatus: string;
+  plumbingElectrical: string;
+  avgPricePerSqmJpy: number;
+  insulationCostPerSqmJpy: number;
+  hvacCostPerSqmJpy: number;
+  estimatedStructuralSurchargeJpy: number;
+  notes: string;
+}
+
 export interface Region {
   prefecture: string;
   medianPriceJpy: number;

@@ -1,6 +1,8 @@
 import { EUR_JPY_RATE, jpyToEur } from "@/lib/data";
+import { getBuildingEraForYear } from "@/lib/building-eras";
 import type {
   BudgetVerdictLevel,
+  BuildingEraCode,
   BuyerProfile,
   Region,
   RenovationLevel,
@@ -68,6 +70,51 @@ export function computeRenovationBudget(niveauTravaux: RenovationLevel): number 
   return RENOVATION_BUDGET_JPY[niveauTravaux];
 }
 
+// Affinage "chirurgical" du forfait travaux quand l'année de construction ET
+// la surface habitable du bien réel sont connues : isolation + HVAC calculés
+// au m² selon l'ère du bâtiment, plus une majoration structurelle forfaitaire
+// (mise aux normes sismiques) pour les biens PRE_1981. Ces montants viennent
+// tels quels du jeu de données building_eras.json — aucune donnée inventée,
+// aucun multiplicateur ajouté par rapport à la source.
+export interface SurfaceBasedRenovation {
+  eraCode: BuildingEraCode;
+  isolationJpy: number;
+  hvacJpy: number;
+  majorationStructurelleJpy: number;
+  totalJpy: number;
+}
+
+export function computeSurfaceBasedRenovation(
+  constructionYear: number,
+  surfaceM2: number,
+): SurfaceBasedRenovation {
+  const era = getBuildingEraForYear(constructionYear);
+  const isolationJpy = surfaceM2 * era.insulationCostPerSqmJpy;
+  const hvacJpy = surfaceM2 * era.hvacCostPerSqmJpy;
+  const majorationStructurelleJpy =
+    era.code === "PRE_1981" ? era.estimatedStructuralSurchargeJpy : 0;
+
+  return {
+    eraCode: era.code,
+    isolationJpy,
+    hvacJpy,
+    majorationStructurelleJpy,
+    totalJpy: isolationJpy + hvacJpy + majorationStructurelleJpy,
+  };
+}
+
+// Suggestion de prix de base à partir de la surface et de l'ère du bâtiment
+// (Average_Price_Per_Sqm_JPY du jeu de données). Reste une proposition
+// affichée à l'utilisateur : ne remplace jamais silencieusement le prix
+// choisi via le slider.
+export function computeEstimatedPriceFromSurface(
+  constructionYear: number,
+  surfaceM2: number,
+): number {
+  const era = getBuildingEraForYear(constructionYear);
+  return era.avgPricePerSqmJpy * surfaceM2;
+}
+
 export interface BudgetBreakdown {
   prixAchatJpy: number;
   acquisitionFees: AcquisitionFees;
@@ -75,15 +122,27 @@ export interface BudgetBreakdown {
   totalAcquisitionJpy: number;
   totalProjetJpy: number;
   totalProjetEur: number;
+  surfaceBasedRenovation: SurfaceBasedRenovation | null;
+}
+
+export interface RenovationRefinement {
+  constructionYear: number;
+  surfaceM2: number;
 }
 
 export function computeBudget(
   prixAchatJpy: number,
   profile: BuyerProfile,
   niveauTravaux: RenovationLevel,
+  refinement?: RenovationRefinement | null,
 ): BudgetBreakdown {
   const acquisitionFees = computeAcquisitionFees(prixAchatJpy, profile);
-  const travauxJpy = computeRenovationBudget(niveauTravaux);
+  const surfaceBasedRenovation = refinement
+    ? computeSurfaceBasedRenovation(refinement.constructionYear, refinement.surfaceM2)
+    : null;
+  const travauxJpy = surfaceBasedRenovation
+    ? surfaceBasedRenovation.totalJpy
+    : computeRenovationBudget(niveauTravaux);
   const totalAcquisitionJpy = prixAchatJpy + acquisitionFees.total;
   const totalProjetJpy = totalAcquisitionJpy + travauxJpy;
 
@@ -94,6 +153,7 @@ export function computeBudget(
     totalAcquisitionJpy,
     totalProjetJpy,
     totalProjetEur: jpyToEur(totalProjetJpy),
+    surfaceBasedRenovation,
   };
 }
 
@@ -138,15 +198,18 @@ export function computeBudgetScenarios(
   prixAchatJpy: number,
   profile: BuyerProfile,
   niveauTravaux: RenovationLevel,
+  refinement?: RenovationRefinement | null,
 ): BudgetScenario[] {
   const acquisitionFees = computeAcquisitionFees(prixAchatJpy, profile);
   const totalAcquisitionJpy = prixAchatJpy + acquisitionFees.total;
-  const renovation = computeRenovationScenarios(niveauTravaux);
+  const baseTravauxJpy = refinement
+    ? computeSurfaceBasedRenovation(refinement.constructionYear, refinement.surfaceM2).totalJpy
+    : computeRenovationBudget(niveauTravaux);
 
   const travauxByLabel: Record<ScenarioLabel, number> = {
-    optimiste: renovation.optimisteJpy,
-    realiste: renovation.realisteJpy,
-    prudent: renovation.prudentJpy,
+    optimiste: baseTravauxJpy * SCENARIO_MULTIPLIERS.optimiste,
+    realiste: baseTravauxJpy * SCENARIO_MULTIPLIERS.realiste,
+    prudent: baseTravauxJpy * SCENARIO_MULTIPLIERS.prudent,
   };
 
   return (Object.keys(SCENARIO_MULTIPLIERS) as ScenarioLabel[]).map((label) => {

@@ -6,10 +6,12 @@ import {
   computeBudget,
   computeBudgetScenarios,
   computeBudgetVerdict,
+  computeEstimatedPriceFromSurface,
   computeLegalSetupFee,
   computeRenovationBudget,
   computeRenovationScenarios,
   computeRiskFlags,
+  computeSurfaceBasedRenovation,
   EUR_JPY_RATE,
 } from "@/lib/calculations";
 import type { Region } from "@/lib/types";
@@ -236,5 +238,96 @@ describe("computeRiskFlags", () => {
     const flags = computeRiskFlags("solo", "leger", SAMPLE_REGION_LOW_RISK, null, 5);
     expect(flags.some((f) => f.key === "isolated-station-distance")).toBe(false);
     expect(flags.some((f) => f.key === "rural-access")).toBe(false);
+  });
+});
+
+describe("computeSurfaceBasedRenovation", () => {
+  it("calcule isolation + HVAC au m² et une majoration structurelle pour PRE_1981", () => {
+    // 80 m², 1975 -> PRE_1981 : (12000+8000)*80 = 1_600_000 isolation+HVAC + 4_000_000 structurel
+    const result = computeSurfaceBasedRenovation(1975, 80);
+    expect(result.eraCode).toBe("PRE_1981");
+    expect(result.isolationJpy).toBe(960_000);
+    expect(result.hvacJpy).toBe(640_000);
+    expect(result.majorationStructurelleJpy).toBe(4_000_000);
+    expect(result.totalJpy).toBe(5_600_000);
+  });
+
+  it("n'applique aucune majoration structurelle pour POST_1981", () => {
+    const result = computeSurfaceBasedRenovation(1990, 80);
+    expect(result.eraCode).toBe("POST_1981");
+    expect(result.majorationStructurelleJpy).toBe(0);
+    expect(result.isolationJpy).toBe(640_000);
+    expect(result.hvacJpy).toBe(480_000);
+    expect(result.totalJpy).toBe(1_120_000);
+  });
+
+  it("n'applique aucune majoration structurelle pour POST_2000", () => {
+    const result = computeSurfaceBasedRenovation(2010, 80);
+    expect(result.eraCode).toBe("POST_2000");
+    expect(result.majorationStructurelleJpy).toBe(0);
+    expect(result.totalJpy).toBe((3000 + 4000) * 80);
+  });
+
+  it("est déterministe et ne divise jamais par zéro (surface nulle)", () => {
+    const result = computeSurfaceBasedRenovation(1975, 0);
+    expect(result.isolationJpy).toBe(0);
+    expect(result.hvacJpy).toBe(0);
+    expect(result.majorationStructurelleJpy).toBe(4_000_000);
+    expect(result.totalJpy).toBe(4_000_000);
+    expect(Number.isNaN(result.totalJpy)).toBe(false);
+  });
+});
+
+describe("computeEstimatedPriceFromSurface", () => {
+  it("multiplie la surface par le prix moyen au m² de l'ère correspondante", () => {
+    expect(computeEstimatedPriceFromSurface(1975, 80)).toBe(2_000_000); // PRE_1981: 25000*80
+    expect(computeEstimatedPriceFromSurface(1990, 80)).toBe(2_800_000); // POST_1981: 35000*80
+    expect(computeEstimatedPriceFromSurface(2010, 80)).toBe(4_000_000); // POST_2000: 50000*80
+  });
+});
+
+describe("computeBudget avec affinage surface/ère (refinement)", () => {
+  it("sans refinement, se comporte exactement comme avant (non-régression)", () => {
+    const budget = computeBudget(3_000_000, "solo", "leger");
+    expect(budget.travauxJpy).toBe(3_000_000);
+    expect(budget.surfaceBasedRenovation).toBeNull();
+    expect(budget.totalProjetJpy).toBeCloseTo(6_615_000, 6);
+  });
+
+  it("avec refinement, remplace le forfait par le calcul détaillé isolation+HVAC+structurel", () => {
+    const budget = computeBudget(3_000_000, "solo", "leger", {
+      constructionYear: 1975,
+      surfaceM2: 80,
+    });
+    expect(budget.surfaceBasedRenovation).not.toBeNull();
+    expect(budget.travauxJpy).toBe(5_600_000);
+    expect(budget.totalProjetJpy).toBeCloseTo(3_000_000 + 615_000 + 5_600_000, 6);
+  });
+
+  it("ne produit jamais NaN même avec une surface à zéro", () => {
+    const budget = computeBudget(3_000_000, "solo", "leger", {
+      constructionYear: 1990,
+      surfaceM2: 0,
+    });
+    expect(Number.isNaN(budget.totalProjetJpy)).toBe(false);
+    expect(budget.travauxJpy).toBe(0);
+  });
+});
+
+describe("computeBudgetScenarios avec refinement", () => {
+  it("sans refinement, se comporte exactement comme avant (non-régression)", () => {
+    const scenarios = computeBudgetScenarios(3_000_000, "solo", "standard");
+    expect(scenarios[0].travauxJpy).toBe(8_000_000);
+  });
+
+  it("avec refinement, applique les scénarios +0/+10/+20% sur le total détaillé", () => {
+    const scenarios = computeBudgetScenarios(3_000_000, "solo", "standard", {
+      constructionYear: 1975,
+      surfaceM2: 80,
+    });
+    // base détaillée = 5_600_000 (voir test computeSurfaceBasedRenovation)
+    expect(scenarios[0].travauxJpy).toBe(5_600_000);
+    expect(scenarios[1].travauxJpy).toBeCloseTo(6_160_000, 6);
+    expect(scenarios[2].travauxJpy).toBeCloseTo(6_720_000, 6);
   });
 });

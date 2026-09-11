@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { computeEstimatedPriceFromSurface } from "@/lib/calculations";
+import { formatJpy } from "@/lib/format";
 import type { RealListing } from "@/lib/types";
 
 interface RealListingSectionProps {
   realListing: RealListing | null;
   onChange: (listing: RealListing | null) => void;
+  onApplyEstimatedPrice?: (priceJpy: number) => void;
 }
 
 const EMPTY_LISTING: RealListing = {
@@ -28,13 +31,22 @@ function parseNumber(raw: string): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
-export function RealListingSection({ realListing, onChange }: RealListingSectionProps) {
+export function RealListingSection({
+  realListing,
+  onChange,
+  onApplyEstimatedPrice,
+}: RealListingSectionProps) {
   const [open, setOpen] = useState(realListing !== null);
   const listing = realListing ?? EMPTY_LISTING;
 
   const update = (patch: Partial<RealListing>) => {
     onChange({ ...listing, ...patch });
   };
+
+  const estimatedPriceJpy =
+    listing.constructionYear && listing.surfaceM2
+      ? computeEstimatedPriceFromSurface(listing.constructionYear, listing.surfaceM2)
+      : null;
 
   if (!open) {
     return (
@@ -147,6 +159,25 @@ export function RealListingSection({ realListing, onChange }: RealListingSection
             />
           </div>
         </div>
+
+        {estimatedPriceJpy !== null && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-accent/30 p-3 text-sm">
+            <p className="text-muted-foreground">
+              Prix estimé selon la surface et l&apos;ère du bâtiment :{" "}
+              <span className="font-medium text-foreground">{formatJpy(estimatedPriceJpy)}</span>{" "}
+              — une proposition indicative, pas une donnée mesurée pour ce bien.
+            </p>
+            {onApplyEstimatedPrice && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onApplyEstimatedPrice(estimatedPriceJpy)}
+              >
+                Utiliser cette estimation
+              </Button>
+            )}
+          </div>
+        )}
       </Card>
     </motion.div>
   );

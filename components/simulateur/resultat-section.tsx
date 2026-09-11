@@ -54,10 +54,18 @@ export function ResultatSection({
 }: ResultatSectionProps) {
   const ready = Boolean(profile && region && renovationLevel);
 
+  const refinement = useMemo(() => {
+    if (!realListing?.constructionYear || !realListing?.surfaceM2) return null;
+    return {
+      constructionYear: realListing.constructionYear,
+      surfaceM2: realListing.surfaceM2,
+    };
+  }, [realListing]);
+
   const budget = useMemo(() => {
     if (!profile || !renovationLevel) return null;
-    return computeBudget(housePriceJpy, profile, renovationLevel);
-  }, [housePriceJpy, profile, renovationLevel]);
+    return computeBudget(housePriceJpy, profile, renovationLevel, refinement);
+  }, [housePriceJpy, profile, renovationLevel, refinement]);
 
   const chartData = useMemo(() => {
     if (!budget) return [];
@@ -78,8 +86,8 @@ export function ResultatSection({
 
   const scenarios = useMemo(() => {
     if (!profile || !renovationLevel) return null;
-    return computeBudgetScenarios(housePriceJpy, profile, renovationLevel);
-  }, [housePriceJpy, profile, renovationLevel]);
+    return computeBudgetScenarios(housePriceJpy, profile, renovationLevel, refinement);
+  }, [housePriceJpy, profile, renovationLevel, refinement]);
 
   const riskFlags = useMemo(() => {
     if (!profile || !renovationLevel) return [];
@@ -110,7 +118,18 @@ export function ResultatSection({
             {region.prefecture.replace(/_/g, " ")} — niveau {region.recommendationLevel}
           </Badge>
         )}
+        {budget?.surfaceBasedRenovation?.eraCode === "PRE_1981" && (
+          <Badge variant="destructive" className="font-normal">
+            ⚠️ Bâtiment pré-1981
+          </Badge>
+        )}
       </div>
+      {budget?.surfaceBasedRenovation?.eraCode === "PRE_1981" && (
+        <p className="mb-2 text-sm text-destructive">
+          Mise aux normes sismiques et isolation renforcée obligatoires — voir le détail des
+          travaux ci-dessous.
+        </p>
+      )}
       <p className="mb-5 text-sm text-muted-foreground">
         {[
           realListing?.city || null,
@@ -411,13 +430,28 @@ function ScenarioComparison({
 }
 
 function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> }) {
+  const surfaceBased = budget.surfaceBasedRenovation;
+
   const rows = [
     { label: "Prix d'achat", value: budget.prixAchatJpy },
     { label: "Frais d'agence (Fudōsan)", value: budget.acquisitionFees.agence },
     { label: "Shihō shoshi (juriste)", value: budget.acquisitionFees.juriste },
     { label: "Taxes (acquisition + enregistrement)", value: budget.acquisitionFees.taxes },
     { label: "Montage juridique", value: budget.acquisitionFees.montageJuridique },
-    { label: "Travaux", value: budget.travauxJpy },
+    ...(surfaceBased
+      ? [
+          { label: "Isolation (au m², selon l'ère du bâtiment)", value: surfaceBased.isolationJpy },
+          { label: "Climatisation / chauffage (HVAC, au m²)", value: surfaceBased.hvacJpy },
+          ...(surfaceBased.majorationStructurelleJpy > 0
+            ? [
+                {
+                  label: "Mise aux normes sismiques (structurel, PRE_1981)",
+                  value: surfaceBased.majorationStructurelleJpy,
+                },
+              ]
+            : []),
+        ]
+      : [{ label: "Travaux", value: budget.travauxJpy }]),
   ];
 
   return (
@@ -425,6 +459,13 @@ function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> 
       <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Détail du calcul
       </p>
+      {surfaceBased && (
+        <p className="mb-3 text-xs text-muted-foreground">
+          Travaux affinés à partir de la surface habitable et de l&apos;année de construction du
+          bien réel renseigné (ère {surfaceBased.eraCode.replace(/_/g, " ")}), au lieu du forfait
+          générique par niveau.
+        </p>
+      )}
       <ul className="space-y-1.5 text-sm">
         {rows.map((row) => (
           <li key={row.label} className="flex justify-between">

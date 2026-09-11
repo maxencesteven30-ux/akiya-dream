@@ -1,0 +1,41 @@
+[
+  {
+    "code": "PRE_1981",
+    "yearRangeLabel": "Avant 1981",
+    "seismicStandard": "Ancienne norme (Kyū-taishin) — risque élevé",
+    "insulationStandard": "Aucune / vitrage simple",
+    "asbestosStatus": "Forte probabilité (murs / toiture)",
+    "plumbingElectrical": "Anciennes canalisations plomb/galvanisées & tableau à fusibles",
+    "avgPricePerSqmJpy": 25000,
+    "insulationCostPerSqmJpy": 12000,
+    "hvacCostPerSqmJpy": 8000,
+    "estimatedStructuralSurchargeJpy": 4000000,
+    "notes": "Mise aux normes sismiques (Taishin hōkyō) obligatoire, en plus d'une remise à niveau complète de l'isolation et du chauffage/climatisation."
+  },
+  {
+    "code": "POST_1981",
+    "yearRangeLabel": "1981 - 2000",
+    "seismicStandard": "Nouvelle norme (Shin-taishin - 1981)",
+    "insulationStandard": "Isolation basique introduite",
+    "asbestosStatus": "Modérée (interdictions strictes après 1975)",
+    "plumbingElectrical": "Plomberie cuivre standard / tableau à disjoncteurs",
+    "avgPricePerSqmJpy": 35000,
+    "insulationCostPerSqmJpy": 8000,
+    "hvacCostPerSqmJpy": 6000,
+    "estimatedStructuralSurchargeJpy": 2000000,
+    "notes": "Structure saine ; l'effort porte sur la mise à niveau de l'isolation d'origine et l'ajout de climatisation multi-split moderne."
+  },
+  {
+    "code": "POST_2000",
+    "yearRangeLabel": "2000 - Présent",
+    "seismicStandard": "Norme moderne (code de construction Heisei 12)",
+    "insulationStandard": "Isolation haute performance obligatoire",
+    "asbestosStatus": "Nulle (amiante interdite depuis 2006)",
+    "plumbingElectrical": "Systèmes modernes",
+    "avgPricePerSqmJpy": 50000,
+    "insulationCostPerSqmJpy": 3000,
+    "hvacCostPerSqmJpy": 4000,
+    "estimatedStructuralSurchargeJpy": 800000,
+    "notes": "Rare sur le marché des akiya ; améliorations thermiques mineures et rafraîchissement standard des systèmes uniquement."
+  }
+]
