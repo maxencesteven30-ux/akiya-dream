@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   title: "Akiya Dream — Simulateur d'achat de maison abandonnée au Japon",
   description:
     "Estimez le coût réel d'achat et de rénovation d'une Akiya au Japon : frais, taxes, travaux et feuille de route.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    title: "Akiya Dream",
+  },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
