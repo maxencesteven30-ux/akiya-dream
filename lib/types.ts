@@ -46,4 +46,8 @@ export interface SimulatorState {
   housePriceJpy: number;
   prefecture: string | null;
   renovationLevel: RenovationLevel | null;
+  capitalDisponibleEur: number | null;
+  reserveSecuriteEur: number | null;
 }
+
+export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

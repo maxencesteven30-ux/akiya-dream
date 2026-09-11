@@ -12,6 +12,7 @@ import {
   ProjetSection,
 } from "@/components/simulateur/projet-section";
 import { ResultatSection } from "@/components/simulateur/resultat-section";
+import { BudgetSection } from "@/components/simulateur/budget-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegions } from "@/lib/data";
 import type {
@@ -26,6 +27,8 @@ const DEFAULT_STATE: SimulatorState = {
   housePriceJpy: 3000000,
   prefecture: null,
   renovationLevel: null,
+  capitalDisponibleEur: null,
+  reserveSecuriteEur: null,
 };
 
 export function Simulateur() {
@@ -84,6 +87,10 @@ export function Simulateur() {
     });
   const setRenovationLevel = (renovationLevel: RenovationLevel) =>
     setState((prev) => ({ ...prev, renovationLevel }));
+  const setCapitalDisponibleEur = (capitalDisponibleEur: number | null) =>
+    setState((prev) => ({ ...prev, capitalDisponibleEur }));
+  const setReserveSecuriteEur = (reserveSecuriteEur: number | null) =>
+    setState((prev) => ({ ...prev, reserveSecuriteEur }));
 
   if (loading) {
     return <SimulateurSkeleton />;
@@ -133,6 +140,16 @@ export function Simulateur() {
               region={regions.find((r) => r.prefecture === state.prefecture) ?? null}
               profile={state.profile}
               renovationLevel={state.renovationLevel}
+            />
+            <Separator />
+            <BudgetSection
+              housePriceJpy={state.housePriceJpy}
+              profile={state.profile}
+              renovationLevel={state.renovationLevel}
+              capitalDisponibleEur={state.capitalDisponibleEur}
+              onCapitalChange={setCapitalDisponibleEur}
+              reserveSecuriteEur={state.reserveSecuriteEur}
+              onReserveChange={setReserveSecuriteEur}
             />
             <Separator />
             <Roadmap profile={state.profile} />

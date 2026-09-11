@@ -1,5 +1,5 @@
 import { EUR_JPY_RATE, jpyToEur } from "@/lib/data";
-import type { BuyerProfile, RenovationLevel } from "@/lib/types";
+import type { BudgetVerdictLevel, BuyerProfile, RenovationLevel } from "@/lib/types";
 
 const AGENCY_FLAT_FEE_JPY = 330_000;
 const AGENCY_FLAT_THRESHOLD_JPY = 8_000_000;
@@ -141,6 +141,44 @@ export function calculateAnnualCosts(
     totalAnnuelJpy,
     coutDixAnsJpy,
     coutDixAnsEur: jpyToEur(coutDixAnsJpy),
+  };
+}
+
+// Seuil déterministe séparant un projet "viable" d'un projet "tendu" :
+// marge (budget disponible - budget nécessaire) rapportée au budget nécessaire.
+// Aucune source externe ne documente ce seuil : c'est une règle de gestion
+// explicite, pas une donnée financière ou juridique.
+const VIABLE_MARGIN_RATIO = 0.1;
+
+export interface BudgetVerdict {
+  budgetNecessaireEur: number;
+  budgetDisponibleEur: number;
+  margeEur: number;
+  verdict: BudgetVerdictLevel;
+}
+
+export function computeBudgetVerdict(
+  totalProjetEur: number,
+  capitalDisponibleEur: number,
+  reserveSecuriteEur: number,
+): BudgetVerdict {
+  const budgetDisponibleEur = capitalDisponibleEur - reserveSecuriteEur;
+  const margeEur = budgetDisponibleEur - totalProjetEur;
+
+  let verdict: BudgetVerdictLevel;
+  if (margeEur < 0) {
+    verdict = "non_viable";
+  } else if (margeEur / totalProjetEur < VIABLE_MARGIN_RATIO) {
+    verdict = "tendu";
+  } else {
+    verdict = "viable";
+  }
+
+  return {
+    budgetNecessaireEur: totalProjetEur,
+    budgetDisponibleEur,
+    margeEur,
+    verdict,
   };
 }
 

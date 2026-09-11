@@ -4,6 +4,7 @@ import {
   computeAcquisitionFees,
   computeAgencyFee,
   computeBudget,
+  computeBudgetVerdict,
   computeLegalSetupFee,
   computeRenovationBudget,
   EUR_JPY_RATE,
@@ -98,5 +99,33 @@ describe("calculateAnnualCosts", () => {
   it("n'ajoute pas de frais comptables pour un profil à deux", () => {
     const costs = calculateAnnualCosts(3_000_000, "duo");
     expect(costs.comptableJpy).toBe(0);
+  });
+});
+
+describe("computeBudgetVerdict", () => {
+  it("soustrait la réserve de sécurité du capital pour obtenir le budget disponible", () => {
+    const verdict = computeBudgetVerdict(58_400, 80_000, 15_000);
+    expect(verdict.budgetDisponibleEur).toBe(65_000);
+  });
+
+  it("verdict viable quand la marge dépasse 10% du budget nécessaire", () => {
+    // Exemple du cahier des charges : 58 400 nécessaire, 65 000 disponible
+    const verdict = computeBudgetVerdict(58_400, 65_000, 0);
+    expect(verdict.margeEur).toBeCloseTo(6_600, 6);
+    expect(verdict.verdict).toBe("viable");
+  });
+
+  it("verdict tendu quand la marge est positive mais sous 10%", () => {
+    // Exemple du cahier des charges : 63 900 nécessaire, 65 000 disponible
+    const verdict = computeBudgetVerdict(63_900, 65_000, 0);
+    expect(verdict.margeEur).toBeCloseTo(1_100, 6);
+    expect(verdict.verdict).toBe("tendu");
+  });
+
+  it("verdict non viable quand la marge est négative", () => {
+    // Exemple du cahier des charges : 72 000 nécessaire, 65 000 disponible
+    const verdict = computeBudgetVerdict(72_000, 65_000, 0);
+    expect(verdict.margeEur).toBeCloseTo(-7_000, 6);
+    expect(verdict.verdict).toBe("non_viable");
   });
 });
