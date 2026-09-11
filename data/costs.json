@@ -1,0 +1,33 @@
+{
+  "acquisition": [
+    { "item": "Frais_Agence", "costType": "Plafond", "minJpy": 0, "maxJpy": 330000, "percentage": 0, "notes": "Plafond pour biens inferieurs a 8M JPY" },
+    { "item": "Taxe_Acquisition", "costType": "Taxe", "minJpy": 0, "maxJpy": 0, "percentage": 3.0, "notes": "Sur valeur fiscale" },
+    { "item": "Droit_Enregistrement", "costType": "Taxe", "minJpy": 0, "maxJpy": 0, "percentage": 1.5, "notes": "Sur valeur fiscale terrain" },
+    { "item": "Timbre_Fiscal", "costType": "Fixe", "minJpy": 1000, "maxJpy": 60000, "percentage": 0, "notes": "Selon prix de vente contractuel" },
+    { "item": "Shiho_Shoshi", "costType": "Honoraires", "minJpy": 50000, "maxJpy": 300000, "percentage": 0, "notes": "Inclus majoration SCI et traductions" },
+    { "item": "Inspection_Technique", "costType": "Service", "minJpy": 30000, "maxJpy": 300000, "percentage": 0, "notes": "Diagnostics termites et structure" },
+    { "item": "Traduction_Interprete", "costType": "Service", "minJpy": 50000, "maxJpy": 200000, "percentage": 0, "notes": "Assistance administrative" }
+  ],
+  "renovation": [
+    { "category": "Global", "item": "Rafraichissement_Leger", "minJpy": 2000000, "maxJpy": 5000000 },
+    { "category": "Global", "item": "Renovation_Standard", "minJpy": 5000000, "maxJpy": 12000000 },
+    { "category": "Global", "item": "Renovation_Lourde_Kominka", "minJpy": 10000000, "maxJpy": 25000000 },
+    { "category": "Specifique", "item": "Toiture", "minJpy": 500000, "maxJpy": 2000000 },
+    { "category": "Specifique", "item": "Cuisine", "minJpy": 500000, "maxJpy": 1500000 },
+    { "category": "Specifique", "item": "Salle_de_Bain", "minJpy": 500000, "maxJpy": 1500000 },
+    { "category": "Specifique", "item": "Electricite", "minJpy": 300000, "maxJpy": 800000 },
+    { "category": "Specifique", "item": "Plomberie", "minJpy": 300000, "maxJpy": 800000 },
+    { "category": "Specifique", "item": "Renforcement_Sismique", "minJpy": 1000000, "maxJpy": 3000000 },
+    { "category": "Specifique", "item": "Traitement_Termites", "minJpy": 100000, "maxJpy": 300000 }
+  ],
+  "annual": [
+    { "item": "Taxe_Fonciere", "minJpy": 30000, "maxJpy": 150000, "percentage": 1.4, "notes": "Sur valeur fiscale et non sur prix achat" },
+    { "item": "Taxe_Urbanisme", "minJpy": 0, "maxJpy": 30000, "percentage": 0.3, "notes": "Si zonage applicable" },
+    { "item": "Gestion_Distance", "minJpy": 33000, "maxJpy": 150000, "percentage": 0, "notes": "Visites et ventilation par prestataire" },
+    { "item": "Assurance", "minJpy": 20000, "maxJpy": 120000, "percentage": 0, "notes": "Couverture incendie et seisme" },
+    { "item": "Entretien_Jardin", "minJpy": 0, "maxJpy": 150000, "percentage": 0, "notes": "Tonte et elagage" },
+    { "item": "Controle_Fosse_Septique", "minJpy": 10000, "maxJpy": 60000, "percentage": 0, "notes": "Obligation legale annuelle" },
+    { "item": "Provision_Reparations", "minJpy": 50000, "maxJpy": 300000, "percentage": 0, "notes": "Maintenance preventive toiture et humidite" },
+    { "item": "Comptable_Godo_Kaisha", "minJpy": 200000, "maxJpy": 300000, "percentage": 0, "notes": "Seulement si montage en societe japonaise" }
+  ]
+}

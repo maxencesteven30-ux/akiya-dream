@@ -1,0 +1,20 @@
+[
+  { "prefecture": "Yamaguchi", "medianPriceJpy": 3000000, "medianAgeYears": 45, "pre1981Percent": 50, "subsidyMaxJpy": 0, "recommendationLevel": "A" },
+  { "prefecture": "Shimane", "medianPriceJpy": 3000000, "medianAgeYears": 50, "pre1981Percent": 61, "subsidyMaxJpy": 0, "recommendationLevel": "C" },
+  { "prefecture": "Tottori", "medianPriceJpy": 5000000, "medianAgeYears": 39, "pre1981Percent": 40, "subsidyMaxJpy": 0, "recommendationLevel": "C" },
+  { "prefecture": "Okayama", "medianPriceJpy": 3800000, "medianAgeYears": 42, "pre1981Percent": 45, "subsidyMaxJpy": 1200000, "recommendationLevel": "A" },
+  { "prefecture": "Ehime", "medianPriceJpy": 4500000, "medianAgeYears": 40, "pre1981Percent": 38, "subsidyMaxJpy": 0, "recommendationLevel": "A" },
+  { "prefecture": "Tokushima", "medianPriceJpy": 3600000, "medianAgeYears": 42, "pre1981Percent": 43, "subsidyMaxJpy": 0, "recommendationLevel": "B" },
+  { "prefecture": "Oita", "medianPriceJpy": 5000000, "medianAgeYears": 33, "pre1981Percent": 35, "subsidyMaxJpy": 0, "recommendationLevel": "B" },
+  { "prefecture": "Kumamoto", "medianPriceJpy": 3900000, "medianAgeYears": 31, "pre1981Percent": 28, "subsidyMaxJpy": 0, "recommendationLevel": "A" },
+  { "prefecture": "Kagoshima", "medianPriceJpy": 3800000, "medianAgeYears": 36, "pre1981Percent": 33, "subsidyMaxJpy": 0, "recommendationLevel": "C" },
+  { "prefecture": "Miyazaki", "medianPriceJpy": 5000000, "medianAgeYears": 37, "pre1981Percent": 32, "subsidyMaxJpy": 0, "recommendationLevel": "C" },
+  { "prefecture": "Gifu", "medianPriceJpy": 4500000, "medianAgeYears": 41, "pre1981Percent": 41, "subsidyMaxJpy": 0, "recommendationLevel": "B" },
+  { "prefecture": "Nagano", "medianPriceJpy": 5000000, "medianAgeYears": 37, "pre1981Percent": 38, "subsidyMaxJpy": 0, "recommendationLevel": "B" },
+  { "prefecture": "Wakayama", "medianPriceJpy": 4500000, "medianAgeYears": 41, "pre1981Percent": 40, "subsidyMaxJpy": 2000000, "recommendationLevel": "B" },
+  { "prefecture": "Niigata", "medianPriceJpy": 2900000, "medianAgeYears": 40, "pre1981Percent": 50, "subsidyMaxJpy": 800000, "recommendationLevel": "C" },
+  { "prefecture": "Aomori", "medianPriceJpy": 3000000, "medianAgeYears": 45, "pre1981Percent": 50, "subsidyMaxJpy": 0, "recommendationLevel": "C" },
+  { "prefecture": "Fukuoka_Periph", "medianPriceJpy": 4800000, "medianAgeYears": 35, "pre1981Percent": 30, "subsidyMaxJpy": 0, "recommendationLevel": "B" },
+  { "prefecture": "Hyogo_Rural", "medianPriceJpy": 5800000, "medianAgeYears": 40, "pre1981Percent": 40, "subsidyMaxJpy": 1500000, "recommendationLevel": "B" },
+  { "prefecture": "Hokkaido", "medianPriceJpy": 3000000, "medianAgeYears": 45, "pre1981Percent": 50, "subsidyMaxJpy": 3000000, "recommendationLevel": "C" }
+]

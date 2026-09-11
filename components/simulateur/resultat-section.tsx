@@ -1,0 +1,314 @@
+"use client";
+
+import { useMemo } from "react";
+import { motion } from "framer-motion";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from "@/components/ui/badge";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { calculateAnnualCosts, computeBudget } from "@/lib/calculations";
+import { formatEur, formatJpy } from "@/lib/format";
+import type { BuyerProfile, RenovationLevel } from "@/lib/types";
+
+interface ResultatSectionProps {
+  housePriceJpy: number;
+  prefecture: string | null;
+  profile: BuyerProfile | null;
+  renovationLevel: RenovationLevel | null;
+}
+
+const SEGMENT_COLORS = {
+  maison: "#D9D3C7",
+  acquisition: "#3D3935",
+  travaux: "#A0522D",
+} as const;
+
+export function ResultatSection({
+  housePriceJpy,
+  prefecture,
+  profile,
+  renovationLevel,
+}: ResultatSectionProps) {
+  const ready = Boolean(profile && prefecture && renovationLevel);
+
+  const budget = useMemo(() => {
+    if (!profile || !renovationLevel) return null;
+    return computeBudget(housePriceJpy, profile, renovationLevel);
+  }, [housePriceJpy, profile, renovationLevel]);
+
+  const chartData = useMemo(() => {
+    if (!budget) return [];
+    return [
+      {
+        name: "Budget",
+        maison: budget.prixAchatJpy,
+        acquisition: budget.acquisitionFees.total,
+        travaux: budget.travauxJpy,
+      },
+    ];
+  }, [budget]);
+
+  const annualCosts = useMemo(() => {
+    if (!profile) return null;
+    return calculateAnnualCosts(housePriceJpy, profile);
+  }, [housePriceJpy, profile]);
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+    >
+      <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
+        Étape 3 — Le choc de réalité
+      </h2>
+      <p className="mb-5 text-lg text-foreground">Du prix affiché au coût réel</p>
+
+      <Card className="border-border p-6 sm:p-8">
+        {!ready || !budget ? (
+          <p className="text-sm text-muted-foreground">
+            Complétez les étapes 1 et 2 pour voir apparaître la ventilation des coûts.
+          </p>
+        ) : (
+          <div className="space-y-8">
+            <div className="grid gap-6 sm:grid-cols-2 sm:items-end">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Coût réel total
+                </p>
+                <p className="text-3xl font-semibold text-foreground">
+                  {formatJpy(budget.totalProjetJpy)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  soit {formatEur(budget.totalProjetEur)}
+                </p>
+              </div>
+              <Legend budget={budget} />
+            </div>
+
+            <ResponsiveContainer width="100%" height={140} minWidth={0}>
+              <BarChart
+                data={chartData}
+                layout="vertical"
+                margin={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              >
+                <CartesianGrid horizontal={false} stroke="var(--border)" />
+                <XAxis
+                  type="number"
+                  tickFormatter={(v: number) => `${(v / 1_000_000).toFixed(0)}M`}
+                  stroke="var(--muted-foreground)"
+                  fontSize={12}
+                />
+                <YAxis type="category" dataKey="name" hide />
+                <Tooltip
+                  content={<ChartTooltip />}
+                  cursor={{ fill: "var(--muted)", opacity: 0.5 }}
+                />
+                <Bar dataKey="maison" stackId="budget" fill={SEGMENT_COLORS.maison}>
+                  <Cell fill={SEGMENT_COLORS.maison} stroke="var(--border)" strokeWidth={1} />
+                </Bar>
+                <Bar dataKey="acquisition" stackId="budget" fill={SEGMENT_COLORS.acquisition}>
+                  <Cell fill={SEGMENT_COLORS.acquisition} />
+                </Bar>
+                <Bar dataKey="travaux" stackId="budget" fill={SEGMENT_COLORS.travaux}>
+                  <Cell fill={SEGMENT_COLORS.travaux} stroke="var(--border)" strokeWidth={1} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+
+            <DetailBreakdown budget={budget} />
+          </div>
+        )}
+      </Card>
+
+      {ready && annualCosts && profile && (
+        <div className="mt-6">
+          <AnnualCostsCard annualCosts={annualCosts} profile={profile} />
+        </div>
+      )}
+    </motion.section>
+  );
+}
+
+const SEGMENT_LABELS = {
+  maison: "Prix de la maison",
+  acquisition: "Frais d'acquisition",
+  travaux: "Travaux",
+} as const;
+
+interface ChartTooltipPayloadEntry {
+  dataKey?: string;
+  value?: number;
+}
+
+function ChartTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: ChartTooltipPayloadEntry[];
+}) {
+  if (!active || !payload || payload.length === 0) return null;
+
+  return (
+    <div className="rounded-md border border-border bg-card px-3 py-2 shadow-sm">
+      <ul className="space-y-1">
+        {payload.map((entry) => {
+          const key = entry.dataKey as keyof typeof SEGMENT_COLORS;
+          if (!key) return null;
+          return (
+            <li key={key} className="flex items-center gap-2 text-xs">
+              <span
+                className="h-2 w-2 shrink-0 rounded-full ring-1 ring-inset ring-black/10"
+                style={{ background: SEGMENT_COLORS[key] }}
+              />
+              <span className="text-muted-foreground">{SEGMENT_LABELS[key]}</span>
+              <span className="ml-auto pl-3 font-medium text-foreground">
+                {formatJpy(Number(entry.value ?? 0))}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+function Legend({ budget }: { budget: ReturnType<typeof computeBudget> }) {
+  const items = [
+    { key: "maison", label: SEGMENT_LABELS.maison, value: budget.prixAchatJpy },
+    {
+      key: "acquisition",
+      label: SEGMENT_LABELS.acquisition,
+      value: budget.acquisitionFees.total,
+    },
+    { key: "travaux", label: SEGMENT_LABELS.travaux, value: budget.travauxJpy },
+  ] as const;
+
+  return (
+    <ul className="space-y-1.5 sm:justify-self-end">
+      {items.map((item) => (
+        <li key={item.key} className="flex items-center gap-2 text-sm">
+          <span
+            className="h-2.5 w-2.5 shrink-0 rounded-full ring-1 ring-inset ring-black/10"
+            style={{ background: SEGMENT_COLORS[item.key] }}
+          />
+          <span className="text-muted-foreground">{item.label}</span>
+          <span className="ml-auto font-medium text-foreground">
+            {formatJpy(item.value)}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function AnnualCostsCard({
+  annualCosts,
+  profile,
+}: {
+  annualCosts: ReturnType<typeof calculateAnnualCosts>;
+  profile: BuyerProfile;
+}) {
+  const rows = [
+    { label: "Taxe foncière (Kotei shisan-zei)", value: annualCosts.taxeFonciereJpy },
+    { label: "Taxe d'urbanisme (Toshi keikaku-zei)", value: annualCosts.taxeUrbanismeJpy },
+    { label: "Assurance habitation & séisme", value: annualCosts.assuranceJpy },
+    { label: "Gestion à distance & entretien", value: annualCosts.gestionEntretienJpy },
+    { label: "Comptable (Zeirishi — Gōdō Kaisha)", value: annualCosts.comptableJpy },
+  ];
+
+  return (
+    <Card className="border-border p-6 sm:p-8">
+      <div className="mb-4">
+        <p className="text-xs uppercase tracking-wide text-muted-foreground">
+          Coût de possession sur 10 ans
+        </p>
+        <p className="text-3xl font-semibold text-foreground">
+          {formatJpy(annualCosts.coutDixAnsJpy)}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          soit {formatEur(annualCosts.coutDixAnsEur)} — {formatJpy(annualCosts.totalAnnuelJpy)}
+          {" "}/ an
+        </p>
+      </div>
+
+      {profile === "investisseur" && (
+        <Badge variant="destructive" className="mb-4">
+          Gōdō Kaisha : {formatJpy(annualCosts.comptableJpy)} de frais comptables s&apos;ajoutent
+          chaque année
+        </Badge>
+      )}
+
+      <Separator className="mb-2" />
+
+      <Accordion defaultValue={["detail"]}>
+        <AccordionItem value="detail">
+          <AccordionTrigger className="text-sm text-muted-foreground">
+            Détail de la charge annuelle
+          </AccordionTrigger>
+          <AccordionContent>
+            <ul className="space-y-1.5 text-sm">
+              {rows.map((row) => (
+                <li key={row.label} className="flex justify-between">
+                  <span className="text-muted-foreground">{row.label}</span>
+                  <span className="text-foreground">
+                    {row.value > 0 ? formatJpy(row.value) : "—"}
+                  </span>
+                </li>
+              ))}
+              <li className="flex justify-between border-t border-border pt-1.5 font-medium">
+                <span className="text-foreground">Total annuel</span>
+                <span className="text-foreground">{formatJpy(annualCosts.totalAnnuelJpy)}</span>
+              </li>
+            </ul>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </Card>
+  );
+}
+
+function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> }) {
+  const rows = [
+    { label: "Prix d'achat", value: budget.prixAchatJpy },
+    { label: "Frais d'agence (Fudōsan)", value: budget.acquisitionFees.agence },
+    { label: "Shihō shoshi (juriste)", value: budget.acquisitionFees.juriste },
+    { label: "Taxes (acquisition + enregistrement)", value: budget.acquisitionFees.taxes },
+    { label: "Montage juridique", value: budget.acquisitionFees.montageJuridique },
+    { label: "Travaux", value: budget.travauxJpy },
+  ];
+
+  return (
+    <div className="border-t border-border pt-4">
+      <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        Détail du calcul
+      </p>
+      <ul className="space-y-1.5 text-sm">
+        {rows.map((row) => (
+          <li key={row.label} className="flex justify-between">
+            <span className="text-muted-foreground">{row.label}</span>
+            <span className="text-foreground">
+              {row.value > 0 ? formatJpy(row.value) : "—"}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
