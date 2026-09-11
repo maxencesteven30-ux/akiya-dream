@@ -1,11 +1,13 @@
 import { EUR_JPY_RATE, jpyToEur } from "@/lib/data";
 import { getBuildingEraForYear } from "@/lib/building-eras";
 import { getAgencyServiceMidpoint } from "@/lib/agency-services";
+import { getHiddenCostMidpoint } from "@/lib/hidden-costs";
 import type {
   AccompanimentLevel,
   BudgetVerdictLevel,
   BuildingEraCode,
   BuyerProfile,
+  HiddenCostsSelection,
   Region,
   RenovationLevel,
 } from "@/lib/types";
@@ -176,10 +178,34 @@ export function computeEstimatedPriceFromSurface(
   return era.avgPricePerSqmJpy * surfaceM2;
 }
 
+// Sélection de frais cachés/imprévus terrain (section "Configuration
+// avancée des risques"). Chaque case est un forfait ponctuel optionnel,
+// jamais activé par défaut — montants = milieu de fourchette de
+// data/hidden_costs.json (même principe que computeAccompanimentFee). Le
+// type lui-même vit dans lib/types.ts (même pattern qu'AccompanimentLevel).
+const EMPTY_HIDDEN_COSTS_SELECTION: HiddenCostsSelection = {
+  surveyBoundary: false,
+  pestTreatment: false,
+  septicTankService: false,
+  backTaxesNegotiation: false,
+};
+
+export function computeHiddenCostsTotal(
+  selection: HiddenCostsSelection = EMPTY_HIDDEN_COSTS_SELECTION,
+): number {
+  let total = 0;
+  if (selection.surveyBoundary) total += getHiddenCostMidpoint("HC_SURVEY_BOUND");
+  if (selection.pestTreatment) total += getHiddenCostMidpoint("HC_PEST_EXTERMINATE");
+  if (selection.septicTankService) total += getHiddenCostMidpoint("HC_SEPTIC_CLEAN");
+  if (selection.backTaxesNegotiation) total += getHiddenCostMidpoint("HC_BACK_TAXES");
+  return total;
+}
+
 export interface BudgetBreakdown {
   prixAchatJpy: number;
   acquisitionFees: AcquisitionFees;
   travauxJpy: number;
+  imprevusJpy: number;
   totalAcquisitionJpy: number;
   totalProjetJpy: number;
   totalProjetEur: number;
@@ -198,6 +224,7 @@ export function computeBudget(
   refinement?: RenovationRefinement | null,
   accompanimentLevel: AccompanimentLevel = "autonome",
   needsTranslation = false,
+  hiddenCosts?: HiddenCostsSelection,
 ): BudgetBreakdown {
   const acquisitionFees = computeAcquisitionFees(
     prixAchatJpy,
@@ -211,13 +238,15 @@ export function computeBudget(
   const travauxJpy = surfaceBasedRenovation
     ? surfaceBasedRenovation.totalJpy
     : computeRenovationBudget(niveauTravaux);
+  const imprevusJpy = computeHiddenCostsTotal(hiddenCosts);
   const totalAcquisitionJpy = prixAchatJpy + acquisitionFees.total;
-  const totalProjetJpy = totalAcquisitionJpy + travauxJpy;
+  const totalProjetJpy = totalAcquisitionJpy + travauxJpy + imprevusJpy;
 
   return {
     prixAchatJpy,
     acquisitionFees,
     travauxJpy,
+    imprevusJpy,
     totalAcquisitionJpy,
     totalProjetJpy,
     totalProjetEur: jpyToEur(totalProjetJpy),
@@ -260,6 +289,7 @@ export interface BudgetScenario {
   travauxJpy: number;
   subsidiesJpy: number;
   netTravauxJpy: number;
+  imprevusJpy: number;
   totalProjetJpy: number;
   totalProjetEur: number;
 }
@@ -272,6 +302,7 @@ export function computeBudgetScenarios(
   subsidiesJpy = 0,
   accompanimentLevel: AccompanimentLevel = "autonome",
   needsTranslation = false,
+  hiddenCosts?: HiddenCostsSelection,
 ): BudgetScenario[] {
   const acquisitionFees = computeAcquisitionFees(
     prixAchatJpy,
@@ -283,6 +314,7 @@ export function computeBudgetScenarios(
   const baseTravauxJpy = refinement
     ? computeSurfaceBasedRenovation(refinement.constructionYear, refinement.surfaceM2).totalJpy
     : computeRenovationBudget(niveauTravaux);
+  const imprevusJpy = computeHiddenCostsTotal(hiddenCosts);
 
   const travauxByLabel: Record<ScenarioLabel, number> = {
     optimiste: baseTravauxJpy * SCENARIO_MULTIPLIERS.optimiste,
@@ -295,15 +327,17 @@ export function computeBudgetScenarios(
     // Les subventions réduisent le net à payer, jamais le montant brut des
     // travaux affiché ailleurs (travauxJpy reste la valeur brute, inchangée,
     // pour ne pas modifier silencieusement ce qu'affichent déjà
-    // resultat-section.tsx / opportunity-section.tsx).
+    // resultat-section.tsx / opportunity-section.tsx). Les imprévus terrain
+    // sont un forfait fixe, non proportionnel au multiplicateur du scénario.
     const netTravauxJpy = Math.max(0, travauxJpy - subsidiesJpy);
-    const totalProjetJpy = totalAcquisitionJpy + netTravauxJpy;
+    const totalProjetJpy = totalAcquisitionJpy + netTravauxJpy + imprevusJpy;
     return {
       label,
       multiplier: SCENARIO_MULTIPLIERS[label],
       travauxJpy,
       subsidiesJpy,
       netTravauxJpy,
+      imprevusJpy,
       totalProjetJpy,
       totalProjetEur: jpyToEur(totalProjetJpy),
     };
@@ -325,6 +359,8 @@ export interface AnnualCostsBreakdown {
   assuranceJpy: number;
   gestionEntretienJpy: number;
   comptableJpy: number;
+  chonaikaiJpy: number;
+  deneigementJpy: number;
   totalAnnuelJpy: number;
   coutDixAnsJpy: number;
   coutDixAnsEur: number;
@@ -333,6 +369,8 @@ export interface AnnualCostsBreakdown {
 export function calculateAnnualCosts(
   prixAchatJpy: number,
   profile: BuyerProfile,
+  includeNeighborhoodAssociation = false,
+  snowyRegion = false,
 ): AnnualCostsBreakdown {
   const valeurFiscaleEstimeeJpy = prixAchatJpy * TAXABLE_VALUE_RATIO;
   const taxeFonciereJpy = valeurFiscaleEstimeeJpy * PROPERTY_TAX_RATE;
@@ -340,13 +378,19 @@ export function calculateAnnualCosts(
   const assuranceJpy = INSURANCE_JPY;
   const gestionEntretienJpy = MANAGEMENT_MAINTENANCE_JPY;
   const comptableJpy = profile === "investisseur" ? GK_ACCOUNTING_JPY : 0;
+  const chonaikaiJpy = includeNeighborhoodAssociation
+    ? getHiddenCostMidpoint("HC_NEIGHBORHOOD_HOA")
+    : 0;
+  const deneigementJpy = snowyRegion ? getHiddenCostMidpoint("HC_SNOW_REMOVAL") : 0;
 
   const totalAnnuelJpy =
     taxeFonciereJpy +
     taxeUrbanismeJpy +
     assuranceJpy +
     gestionEntretienJpy +
-    comptableJpy;
+    comptableJpy +
+    chonaikaiJpy +
+    deneigementJpy;
   const coutDixAnsJpy = totalAnnuelJpy * OWNERSHIP_HORIZON_YEARS;
 
   return {
@@ -356,6 +400,8 @@ export function calculateAnnualCosts(
     assuranceJpy,
     gestionEntretienJpy,
     comptableJpy,
+    chonaikaiJpy,
+    deneigementJpy,
     totalAnnuelJpy,
     coutDixAnsJpy,
     coutDixAnsEur: jpyToEur(coutDixAnsJpy),

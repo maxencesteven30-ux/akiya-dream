@@ -8,6 +8,7 @@ import {
   computeBudgetScenarios,
   computeBudgetVerdict,
   computeEstimatedPriceFromSurface,
+  computeHiddenCostsTotal,
   computeLegalSetupFee,
   computeMaxAffordablePriceJpy,
   computeRenovationBudget,
@@ -182,6 +183,30 @@ describe("calculateAnnualCosts", () => {
   it("n'ajoute pas de frais comptables pour un profil à deux", () => {
     const costs = calculateAnnualCosts(3_000_000, "duo");
     expect(costs.comptableJpy).toBe(0);
+  });
+
+  it("sans association de quartier ni région neigeuse (défaut), chonaikai/déneigement à 0 (non-régression)", () => {
+    const costs = calculateAnnualCosts(3_000_000, "solo");
+    expect(costs.chonaikaiJpy).toBe(0);
+    expect(costs.deneigementJpy).toBe(0);
+    expect(costs.totalAnnuelJpy).toBeCloseTo(175_500, 6);
+  });
+
+  it("ajoute la cotisation Chōnaikai si demandée", () => {
+    const costs = calculateAnnualCosts(3_000_000, "solo", true, false);
+    expect(costs.chonaikaiJpy).toBe(21_000);
+    expect(costs.totalAnnuelJpy).toBeCloseTo(175_500 + 21_000, 6);
+  });
+
+  it("ajoute le déneigement pour une région neigeuse", () => {
+    const costs = calculateAnnualCosts(3_000_000, "solo", false, true);
+    expect(costs.deneigementJpy).toBe(100_000);
+    expect(costs.totalAnnuelJpy).toBeCloseTo(175_500 + 100_000, 6);
+  });
+
+  it("cumule les deux si les deux sont activés", () => {
+    const costs = calculateAnnualCosts(3_000_000, "solo", true, true);
+    expect(costs.totalAnnuelJpy).toBeCloseTo(175_500 + 21_000 + 100_000, 6);
   });
 });
 
@@ -460,5 +485,84 @@ describe("computeBudgetScenarios avec refinement", () => {
     expect(scenarios[0].travauxJpy).toBe(5_600_000);
     expect(scenarios[1].travauxJpy).toBeCloseTo(6_160_000, 6);
     expect(scenarios[2].travauxJpy).toBeCloseTo(6_720_000, 6);
+  });
+});
+
+describe("computeHiddenCostsTotal", () => {
+  it("retourne 0 sans sélection (défaut)", () => {
+    expect(computeHiddenCostsTotal()).toBe(0);
+  });
+
+  it("retourne 0 avec toutes les options désactivées", () => {
+    expect(
+      computeHiddenCostsTotal({
+        surveyBoundary: false,
+        pestTreatment: false,
+        septicTankService: false,
+        backTaxesNegotiation: false,
+      }),
+    ).toBe(0);
+  });
+
+  it("additionne les milieux de fourchette des options activées", () => {
+    const total = computeHiddenCostsTotal({
+      surveyBoundary: true,
+      pestTreatment: false,
+      septicTankService: true,
+      backTaxesNegotiation: false,
+    });
+    // bornage 275 000 + fosse septique 100 000
+    expect(total).toBe(375_000);
+  });
+
+  it("additionne les 4 options si toutes activées", () => {
+    const total = computeHiddenCostsTotal({
+      surveyBoundary: true,
+      pestTreatment: true,
+      septicTankService: true,
+      backTaxesNegotiation: true,
+    });
+    // 275 000 + 325 000 + 100 000 + 150 000
+    expect(total).toBe(850_000);
+  });
+});
+
+describe("computeBudget avec frais cachés", () => {
+  it("sans hiddenCosts (défaut), imprevusJpy est 0 (non-régression)", () => {
+    const budget = computeBudget(3_000_000, "solo", "leger");
+    expect(budget.imprevusJpy).toBe(0);
+    expect(budget.totalProjetJpy).toBeCloseTo(6_615_000, 6);
+  });
+
+  it("ajoute les imprévus sélectionnés au total, sans modifier travauxJpy", () => {
+    const budget = computeBudget(3_000_000, "solo", "leger", null, "autonome", false, {
+      surveyBoundary: true,
+      pestTreatment: false,
+      septicTankService: false,
+      backTaxesNegotiation: false,
+    });
+    expect(budget.imprevusJpy).toBe(275_000);
+    expect(budget.travauxJpy).toBe(3_000_000);
+    expect(budget.totalProjetJpy).toBeCloseTo(6_615_000 + 275_000, 6);
+  });
+});
+
+describe("computeBudgetScenarios avec frais cachés", () => {
+  it("ajoute le même forfait d'imprévus (fixe) à chaque scénario", () => {
+    const scenarios = computeBudgetScenarios(
+      3_000_000,
+      "solo",
+      "standard",
+      null,
+      0,
+      "autonome",
+      false,
+      { surveyBoundary: false, pestTreatment: false, septicTankService: true, backTaxesNegotiation: true },
+    );
+    for (const scenario of scenarios) {
+      expect(scenario.imprevusJpy).toBe(250_000); // 100 000 + 150 000
+    }
+    expect(scenarios[0].totalProjetJpy).toBeCloseTo(11_615_000 + 250_000, 6);
+    expect(scenarios[2].totalProjetJpy).toBeCloseTo(13_215_000 + 250_000, 6);
   });
 });

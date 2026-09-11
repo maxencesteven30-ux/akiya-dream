@@ -17,6 +17,7 @@ import { ComparateurSection } from "@/components/simulateur/comparateur-section"
 import { RegionFinder } from "@/components/simulateur/region-finder";
 import { JapanMap } from "@/components/simulateur/japan-map";
 import { RealListingSection } from "@/components/simulateur/real-listing-section";
+import { HiddenCostsSection } from "@/components/simulateur/hidden-costs-section";
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
@@ -29,6 +30,7 @@ import { computeOpportunityScore } from "@/lib/opportunity";
 import type {
   AccompanimentLevel,
   BuyerProfile,
+  HiddenCostsSelection,
   NewProjectInput,
   PersistedProject,
   RealListing,
@@ -54,6 +56,17 @@ const DEFAULT_STATE: SimulatorState = {
   realListing: null,
   accompanimentLevel: "autonome",
   needsTranslation: false,
+  hiddenCosts: {
+    surveyBoundary: false,
+    pestTreatment: false,
+    septicTankService: false,
+    backTaxesNegotiation: false,
+  },
+  snowyRegion: false,
+  // Quasi obligatoire en pratique (intégration sociale, ramassage des
+  // ordures) : coché par défaut dans l'UI, mais le moteur de calcul reste
+  // lui-même opt-in (défaut false) pour ne rien changer silencieusement.
+  includeNeighborhoodAssociation: true,
 };
 
 export function Simulateur() {
@@ -172,6 +185,12 @@ export function Simulateur() {
     setState((prev) => ({ ...prev, accompanimentLevel }));
   const setNeedsTranslation = (needsTranslation: boolean) =>
     setState((prev) => ({ ...prev, needsTranslation }));
+  const setHiddenCosts = (hiddenCosts: HiddenCostsSelection) =>
+    setState((prev) => ({ ...prev, hiddenCosts }));
+  const setSnowyRegion = (snowyRegion: boolean) =>
+    setState((prev) => ({ ...prev, snowyRegion }));
+  const setIncludeNeighborhoodAssociation = (includeNeighborhoodAssociation: boolean) =>
+    setState((prev) => ({ ...prev, includeNeighborhoodAssociation }));
 
   const addToComparateur = () => {
     if (!state.profile || !state.renovationLevel) return;
@@ -232,6 +251,9 @@ export function Simulateur() {
       // Pas encore persistés côté Supabase : on conserve la sélection en cours.
       accompanimentLevel: prev.accompanimentLevel,
       needsTranslation: prev.needsTranslation,
+      hiddenCosts: prev.hiddenCosts,
+      snowyRegion: prev.snowyRegion,
+      includeNeighborhoodAssociation: prev.includeNeighborhoodAssociation,
     }));
   };
 
@@ -294,6 +316,14 @@ export function Simulateur() {
               onChange={setRealListing}
               onApplyEstimatedPrice={setHousePriceJpy}
             />
+            <HiddenCostsSection
+              hiddenCosts={state.hiddenCosts}
+              onHiddenCostsChange={setHiddenCosts}
+              snowyRegion={state.snowyRegion}
+              onSnowyRegionChange={setSnowyRegion}
+              includeNeighborhoodAssociation={state.includeNeighborhoodAssociation}
+              onIncludeNeighborhoodAssociationChange={setIncludeNeighborhoodAssociation}
+            />
           </>
         )}
       </AnimatePresence>
@@ -311,6 +341,9 @@ export function Simulateur() {
               subsidiesJpy={subsidiesJpy}
               accompanimentLevel={state.accompanimentLevel}
               needsTranslation={state.needsTranslation}
+              hiddenCosts={state.hiddenCosts}
+              snowyRegion={state.snowyRegion}
+              includeNeighborhoodAssociation={state.includeNeighborhoodAssociation}
             />
             <Separator />
             <BudgetSection
@@ -324,6 +357,7 @@ export function Simulateur() {
               realListing={state.realListing}
               accompanimentLevel={state.accompanimentLevel}
               needsTranslation={state.needsTranslation}
+              hiddenCosts={state.hiddenCosts}
             />
 
             <Separator />
@@ -389,6 +423,7 @@ export function Simulateur() {
                     : null,
                   state.accompanimentLevel,
                   state.needsTranslation,
+                  state.hiddenCosts,
                 ),
                 scenarios: computeBudgetScenarios(
                   state.housePriceJpy,
@@ -403,6 +438,7 @@ export function Simulateur() {
                   subsidiesJpy,
                   state.accompanimentLevel,
                   state.needsTranslation,
+                  state.hiddenCosts,
                 ),
                 opportunity:
                   state.realListing && state.prefecture

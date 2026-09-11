@@ -76,6 +76,13 @@ export interface RealListing {
 
 export type AccompanimentLevel = "autonome" | "curation" | "cle_en_main";
 
+export interface HiddenCostsSelection {
+  surveyBoundary: boolean;
+  pestTreatment: boolean;
+  septicTankService: boolean;
+  backTaxesNegotiation: boolean;
+}
+
 export interface SimulatorState {
   profile: BuyerProfile | null;
   housePriceJpy: number;
@@ -86,6 +93,9 @@ export interface SimulatorState {
   realListing: RealListing | null;
   accompanimentLevel: AccompanimentLevel;
   needsTranslation: boolean;
+  hiddenCosts: HiddenCostsSelection;
+  snowyRegion: boolean;
+  includeNeighborhoodAssociation: boolean;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

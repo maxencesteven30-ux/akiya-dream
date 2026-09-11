@@ -11,6 +11,7 @@ import type {
   AccompanimentLevel,
   BudgetVerdictLevel,
   BuyerProfile,
+  HiddenCostsSelection,
   RealListing,
   RenovationLevel,
 } from "@/lib/types";
@@ -26,6 +27,7 @@ interface BudgetSectionProps {
   realListing: RealListing | null;
   accompanimentLevel?: AccompanimentLevel;
   needsTranslation?: boolean;
+  hiddenCosts?: HiddenCostsSelection;
 }
 
 const VERDICT_LABELS: Record<BudgetVerdictLevel, string> = {
@@ -57,6 +59,7 @@ export function BudgetSection({
   realListing,
   accompanimentLevel = "autonome",
   needsTranslation = false,
+  hiddenCosts,
 }: BudgetSectionProps) {
   const refinement = useMemo(() => {
     if (!realListing?.constructionYear || !realListing?.surfaceM2) return null;
@@ -75,8 +78,17 @@ export function BudgetSection({
         refinement,
         accompanimentLevel,
         needsTranslation,
+        hiddenCosts,
       ).totalProjetEur,
-    [housePriceJpy, profile, renovationLevel, refinement, accompanimentLevel, needsTranslation],
+    [
+      housePriceJpy,
+      profile,
+      renovationLevel,
+      refinement,
+      accompanimentLevel,
+      needsTranslation,
+      hiddenCosts,
+    ],
   );
 
   const verdict = useMemo(() => {

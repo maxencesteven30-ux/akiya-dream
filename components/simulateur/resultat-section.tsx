@@ -34,6 +34,7 @@ import { formatEur, formatJpy } from "@/lib/format";
 import type {
   AccompanimentLevel,
   BuyerProfile,
+  HiddenCostsSelection,
   RealListing,
   Region,
   RenovationLevel,
@@ -48,6 +49,9 @@ interface ResultatSectionProps {
   subsidiesJpy?: number;
   accompanimentLevel?: AccompanimentLevel;
   needsTranslation?: boolean;
+  hiddenCosts?: HiddenCostsSelection;
+  snowyRegion?: boolean;
+  includeNeighborhoodAssociation?: boolean;
 }
 
 const SEGMENT_COLORS = {
@@ -55,6 +59,7 @@ const SEGMENT_COLORS = {
   acquisition: "#3D3935",
   accompagnement: "#8A6D3B",
   travaux: "#A0522D",
+  imprevus: "#C0392B",
 } as const;
 
 export function ResultatSection({
@@ -66,6 +71,9 @@ export function ResultatSection({
   subsidiesJpy = 0,
   accompanimentLevel = "autonome",
   needsTranslation = false,
+  hiddenCosts,
+  snowyRegion = false,
+  includeNeighborhoodAssociation = false,
 }: ResultatSectionProps) {
   const ready = Boolean(profile && region && renovationLevel);
 
@@ -86,8 +94,17 @@ export function ResultatSection({
       refinement,
       accompanimentLevel,
       needsTranslation,
+      hiddenCosts,
     );
-  }, [housePriceJpy, profile, renovationLevel, refinement, accompanimentLevel, needsTranslation]);
+  }, [
+    housePriceJpy,
+    profile,
+    renovationLevel,
+    refinement,
+    accompanimentLevel,
+    needsTranslation,
+    hiddenCosts,
+  ]);
 
   const chartData = useMemo(() => {
     if (!budget) return [];
@@ -100,14 +117,20 @@ export function ResultatSection({
         acquisition: budget.acquisitionFees.total - accompagnement,
         accompagnement,
         travaux: budget.travauxJpy,
+        imprevus: budget.imprevusJpy,
       },
     ];
   }, [budget]);
 
   const annualCosts = useMemo(() => {
     if (!profile) return null;
-    return calculateAnnualCosts(housePriceJpy, profile);
-  }, [housePriceJpy, profile]);
+    return calculateAnnualCosts(
+      housePriceJpy,
+      profile,
+      includeNeighborhoodAssociation,
+      snowyRegion,
+    );
+  }, [housePriceJpy, profile, includeNeighborhoodAssociation, snowyRegion]);
 
   const scenarios = useMemo(() => {
     if (!profile || !renovationLevel) return null;
@@ -119,6 +142,7 @@ export function ResultatSection({
       subsidiesJpy,
       accompanimentLevel,
       needsTranslation,
+      hiddenCosts,
     );
   }, [
     housePriceJpy,
@@ -128,6 +152,7 @@ export function ResultatSection({
     subsidiesJpy,
     accompanimentLevel,
     needsTranslation,
+    hiddenCosts,
   ]);
 
   const riskFlags = useMemo(() => {
@@ -237,6 +262,9 @@ export function ResultatSection({
                 <Bar dataKey="travaux" stackId="budget" fill={SEGMENT_COLORS.travaux}>
                   <Cell fill={SEGMENT_COLORS.travaux} stroke="var(--border)" strokeWidth={1} />
                 </Bar>
+                <Bar dataKey="imprevus" stackId="budget" fill={SEGMENT_COLORS.imprevus}>
+                  <Cell fill={SEGMENT_COLORS.imprevus} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
 
@@ -266,6 +294,7 @@ const SEGMENT_LABELS = {
   acquisition: "Frais d'acquisition & juridiques",
   accompagnement: "Accompagnement & traduction",
   travaux: "Travaux",
+  imprevus: "Frais de sécurisation & imprévus",
 } as const;
 
 interface ChartTooltipPayloadEntry {
@@ -323,6 +352,9 @@ function Legend({ budget }: { budget: ReturnType<typeof computeBudget> }) {
       ? [{ key: "accompagnement" as const, label: SEGMENT_LABELS.accompagnement, value: accompagnement }]
       : []),
     { key: "travaux", label: SEGMENT_LABELS.travaux, value: budget.travauxJpy },
+    ...(budget.imprevusJpy > 0
+      ? [{ key: "imprevus" as const, label: SEGMENT_LABELS.imprevus, value: budget.imprevusJpy }]
+      : []),
   ] as const;
 
   return (
@@ -376,6 +408,8 @@ function AnnualCostsCard({
     { label: "Assurance habitation & séisme", value: annualCosts.assuranceJpy },
     { label: "Gestion à distance & entretien", value: annualCosts.gestionEntretienJpy },
     { label: "Comptable (Zeirishi — Gōdō Kaisha)", value: annualCosts.comptableJpy },
+    { label: "Cotisation associative de quartier (Chōnaikai)", value: annualCosts.chonaikaiJpy },
+    { label: "Déneigement (région à fortes neiges)", value: annualCosts.deneigementJpy },
   ];
 
   return (
@@ -479,6 +513,11 @@ function ScenarioComparison({
                 {formatJpy(scenario.netTravauxJpy)} net
               </p>
             )}
+            {scenario.imprevusJpy > 0 && (
+              <p className="text-xs text-destructive">
+                + {formatJpy(scenario.imprevusJpy)} d&apos;imprévus terrain
+              </p>
+            )}
             <p className="text-foreground">
               Total : {formatJpy(scenario.totalProjetJpy)}
             </p>
@@ -521,6 +560,9 @@ function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> 
             : []),
         ]
       : [{ label: "Travaux", value: budget.travauxJpy }]),
+    ...(budget.imprevusJpy > 0
+      ? [{ label: "Frais de sécurisation & imprévus terrain", value: budget.imprevusJpy }]
+      : []),
   ];
 
   return (

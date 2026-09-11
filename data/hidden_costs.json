@@ -1,0 +1,74 @@
+[
+  {
+    "id": "HC_BACK_TAXES",
+    "category": "Administratif",
+    "itemName": "Arriérés de taxes locales (Taiseki-zei)",
+    "costType": "Variable",
+    "minJpy": 0,
+    "maxJpy": 300000,
+    "description": "Fréquent sur les Akiya abandonnées depuis des années : les anciens propriétaires laissent parfois des impayés de taxe foncière que l'acheteur doit découvrir et purger (ou négocier) avant l'acte."
+  },
+  {
+    "id": "HC_SURVEY_BOUND",
+    "category": "Juridique",
+    "itemName": "Bornage et délimitation géomètre (Chōsa)",
+    "costType": "Forfait",
+    "minJpy": 150000,
+    "maxJpy": 400000,
+    "description": "Indispensable si les limites de terrain sont floues ou partagées avec des voisins (très fréquent en zone rurale), pour éviter les conflits de mitoyenneté."
+  },
+  {
+    "id": "HC_SEPTIC_CLEAN",
+    "category": "Technique",
+    "itemName": "Vidange & Remise en route Fosse Septique (Jōkasō)",
+    "costType": "Forfait",
+    "minJpy": 50000,
+    "maxJpy": 150000,
+    "description": "Une fosse laissée à l'abandon dégage des odeurs insoutenables et nécessite un curage d'urgence, un contrôle sanitaire et le remplissage en eau pour réactiver les bactéries."
+  },
+  {
+    "id": "HC_DEMOLITION_SHED",
+    "category": "Travaux",
+    "itemName": "Démolition de hangars / annexes délabrées",
+    "costType": "Forfait",
+    "minJpy": 200000,
+    "maxJpy": 800000,
+    "description": "Beaucoup d'Akiya incluent des appentis en bois ou des remises effondrées non enregistrées qu'il faut raser pour nettoyer la parcelle."
+  },
+  {
+    "id": "HC_PEST_EXTERMINATE",
+    "category": "Technique",
+    "itemName": "Traitement curatif Termites & Moisissures (Shiariga)",
+    "costType": "Forfait",
+    "minJpy": 150000,
+    "maxJpy": 500000,
+    "description": "Au-delà du diagnostic, si l'humidité a nourri des termites ou des champignons lignivores (Kareha-kin), le traitement chimique des poutres basses est impératif."
+  },
+  {
+    "id": "HC_NEIGHBORHOOD_HOA",
+    "category": "Exploitation",
+    "itemName": "Cotisation associative locale (Chōnaikai)",
+    "costType": "Annuel",
+    "minJpy": 6000,
+    "maxJpy": 36000,
+    "description": "La taxe ou cotisation au comité de village/quartier. Obligatoire pour l'intégration sociale, le ramassage des ordures locales et l'entretien des chemins vicinaux."
+  },
+  {
+    "id": "HC_SNOW_REMOVAL",
+    "category": "Exploitation",
+    "itemName": "Équipement ou service de déneigement (selon région)",
+    "costType": "Saisonnier",
+    "minJpy": 0,
+    "maxJpy": 200000,
+    "description": "Uniquement pour les régions neigeuses (Niigata, Tohoku, Nagano) : achat d'une souffleuse à neige ou mandat d'un voisin/prestataire pour dégager les accès en hiver."
+  },
+  {
+    "id": "HC_UTILITIES_CONNECT",
+    "category": "Technique",
+    "itemName": "Frais d'ouverture / Réactivation des fluides",
+    "costType": "Forfait",
+    "minJpy": 30000,
+    "maxJpy": 100000,
+    "description": "Frais de réouverture des compteurs d'eau, d'électricité et parfois de gaz propane (remplacement des détendeurs et test de fuite)."
+  }
+]
