@@ -59,3 +59,10 @@ export interface SavedProject {
   housePriceJpy: number;
   renovationLevel: RenovationLevel;
 }
+
+export interface RegionAttributes {
+  hasCoastline: boolean | null;
+  shinkansenStationCount: number | null;
+  forestAreaPercent: number | null;
+  avgAnnualSnowfallCm: number | null;
+}

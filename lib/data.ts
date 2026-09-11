@@ -5,6 +5,7 @@ import type {
   CostsData,
   RecommendationLevel,
   Region,
+  RegionAttributes,
   RenovationCost,
 } from "@/lib/types";
 
@@ -149,6 +150,59 @@ export async function fetchAnnualCosts(): Promise<AnnualCost[]> {
   } catch (error) {
     console.error("fetchAnnualCosts failed:", error);
     throw new Error("Impossible de charger les frais annuels depuis Supabase.");
+  }
+}
+
+interface RegionAttributeRow {
+  attribute_key: string;
+  value_numeric: number | null;
+  regions: { name: string } | null;
+}
+
+const EMPTY_REGION_ATTRIBUTES: RegionAttributes = {
+  hasCoastline: null,
+  shinkansenStationCount: null,
+  forestAreaPercent: null,
+  avgAnnualSnowfallCm: null,
+};
+
+export async function fetchRegionAttributes(): Promise<Record<string, RegionAttributes>> {
+  try {
+    const { data, error } = await getSupabaseClient()
+      .from("region_attributes")
+      .select("attribute_key, value_numeric, regions(name)")
+      .returns<RegionAttributeRow[]>();
+
+    if (error) throw error;
+
+    const byRegion: Record<string, RegionAttributes> = {};
+
+    for (const row of data ?? []) {
+      const name = row.regions?.name;
+      if (!name) continue;
+      if (!byRegion[name]) byRegion[name] = { ...EMPTY_REGION_ATTRIBUTES };
+
+      switch (row.attribute_key) {
+        case "has_coastline":
+          byRegion[name].hasCoastline =
+            row.value_numeric === null ? null : row.value_numeric === 1;
+          break;
+        case "shinkansen_station_count":
+          byRegion[name].shinkansenStationCount = row.value_numeric;
+          break;
+        case "forest_area_percent":
+          byRegion[name].forestAreaPercent = row.value_numeric;
+          break;
+        case "avg_annual_snowfall_cm":
+          byRegion[name].avgAnnualSnowfallCm = row.value_numeric;
+          break;
+      }
+    }
+
+    return byRegion;
+  } catch (error) {
+    console.error("fetchRegionAttributes failed:", error);
+    throw new Error("Impossible de charger les attributs régionaux depuis Supabase.");
   }
 }
 
