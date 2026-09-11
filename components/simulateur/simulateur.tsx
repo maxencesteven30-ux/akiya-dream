@@ -283,6 +283,8 @@ export function Simulateur() {
                   renovationLevel={state.renovationLevel}
                   region={regions.find((r) => r.prefecture === state.prefecture) ?? null}
                   realListing={state.realListing}
+                  capitalDisponibleEur={state.capitalDisponibleEur}
+                  reserveSecuriteEur={state.reserveSecuriteEur}
                 />
               </>
             )}

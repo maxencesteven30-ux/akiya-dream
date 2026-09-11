@@ -8,11 +8,13 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
   computeOpportunityScore,
+  FEASIBILITY_LABELS,
   OPPORTUNITY_CATEGORY_LABELS,
   OPPORTUNITY_CONFIDENCE_LABELS,
   OPPORTUNITY_DISCLAIMER,
   OPPORTUNITY_VERIFICATION_REMINDER,
   getOpportunityHeadline,
+  type FeasibilityLevel,
   type OpportunityCategory,
   type OpportunityConfidenceLevel,
 } from "@/lib/opportunity";
@@ -25,6 +27,8 @@ interface OpportunitySectionProps {
   renovationLevel: RenovationLevel;
   region: Region | null;
   realListing: RealListing | null;
+  capitalDisponibleEur: number | null;
+  reserveSecuriteEur: number | null;
 }
 
 const CATEGORY_STYLES: Record<OpportunityCategory, string> = {
@@ -41,12 +45,20 @@ const CONFIDENCE_STYLES: Record<OpportunityConfidenceLevel, string> = {
   high: "text-emerald-600",
 };
 
+const FEASIBILITY_STYLES: Record<FeasibilityLevel, string> = {
+  compatible: "border-emerald-600/30 bg-emerald-600/5",
+  tendu: "border-amber-600/30 bg-amber-600/5",
+  insuffisant: "border-destructive/30 bg-destructive/5",
+};
+
 export function OpportunitySection({
   prixAchatJpy,
   profile,
   renovationLevel,
   region,
   realListing,
+  capitalDisponibleEur,
+  reserveSecuriteEur,
 }: OpportunitySectionProps) {
   const [analyzed, setAnalyzed] = useState(false);
 
@@ -58,10 +70,16 @@ export function OpportunitySection({
       renovationLevel,
       region,
       listing: realListing,
+      capitalDisponibleEur,
+      reserveSecuriteEur,
     });
-  }, [prixAchatJpy, profile, renovationLevel, region, realListing]);
+  }, [prixAchatJpy, profile, renovationLevel, region, realListing, capitalDisponibleEur, reserveSecuriteEur]);
 
   if (!realListing) return null;
+
+  const maxSensitivityTotal = result
+    ? Math.max(...result.scenarios.map((s) => s.totalProjetJpy))
+    : 0;
 
   return (
     <motion.section
@@ -80,18 +98,19 @@ export function OpportunitySection({
         <Card className="border-border p-6 sm:p-8">
           <p className="mb-4 text-sm text-muted-foreground">
             À partir des informations du bien réel renseigné ci-dessus, Akiya Dream calcule une
-            note d&apos;opportunité sur 10 — un score d&apos;attractivité du projet, pas une
-            estimation de valeur vénale ni une expertise.
+            note d&apos;opportunité sur 10 — un score d&apos;attractivité économique du projet à
+            partir des données disponibles, pas une estimation immobilière professionnelle.
           </p>
           <Button onClick={() => setAnalyzed(true)}>Analyser cette opportunité</Button>
         </Card>
       ) : (
         <div className="space-y-6">
+          {/* 1-2. Note /10 + Opportunité */}
           <Card className={`border p-6 sm:p-8 ${CATEGORY_STYLES[result.category]}`}>
             <div className="mb-4 flex flex-wrap items-end justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-wide text-muted-foreground">
-                  Note d&apos;opportunité
+                  🏠 Opportunité du bien
                 </p>
                 <p className="text-5xl font-semibold text-foreground">
                   {result.score.toFixed(1)}
@@ -101,12 +120,16 @@ export function OpportunitySection({
                   {OPPORTUNITY_CATEGORY_LABELS[result.category]}
                 </p>
               </div>
-              <div className="text-right">
-                <p className="text-xs uppercase tracking-wide text-muted-foreground">Confiance</p>
-                <p className={`text-lg font-semibold ${CONFIDENCE_STYLES[result.confidence]}`}>
-                  {OPPORTUNITY_CONFIDENCE_LABELS[result.confidence]}
-                </p>
-              </div>
+              {result.feasibility && (
+                <div className="text-right">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    💰 Faisabilité du projet
+                  </p>
+                  <p className="text-lg font-semibold text-foreground">
+                    {FEASIBILITY_LABELS[result.feasibility]}
+                  </p>
+                </div>
+              )}
             </div>
 
             {result.coverageIncomplete && (
@@ -116,9 +139,45 @@ export function OpportunitySection({
             )}
 
             <p className="text-sm text-foreground">{getOpportunityHeadline(result.category)}</p>
-          </Card>
 
-          <Card className="border-border p-6 sm:p-8">
+            <Separator className="my-4" />
+
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              💰 Analyse du prix
+            </p>
+            <ul className="mb-4 space-y-1.5 text-sm">
+              <li className="flex justify-between">
+                <span className="text-muted-foreground">Prix demandé</span>
+                <span className="text-foreground">{formatJpy(result.priceAnalysis.prixAchatJpy)}</span>
+              </li>
+              {result.priceAnalysis.referenceRegionaleJpy !== null ? (
+                <>
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Référence régionale</span>
+                    <span className="text-foreground">
+                      {formatJpy(result.priceAnalysis.referenceRegionaleJpy)}
+                    </span>
+                  </li>
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Écart</span>
+                    <span className="text-foreground">
+                      {result.priceAnalysis.ecartPercent! > 0 ? "+" : ""}
+                      {result.priceAnalysis.ecartPercent}%
+                    </span>
+                  </li>
+                </>
+              ) : (
+                <li className="text-xs text-muted-foreground">Référence régionale indisponible.</li>
+              )}
+            </ul>
+
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              🧠 Ce que dit l&apos;analyse
+            </p>
+            <p className="text-sm text-foreground">{result.narrative}</p>
+
+            <Separator className="my-4" />
+
             <p className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Détail des critères
             </p>
@@ -138,13 +197,14 @@ export function OpportunitySection({
             </div>
           </Card>
 
+          {/* 3. Coût réel du projet */}
           <Card className="border-border p-6 sm:p-8">
             <p className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Coût total du projet
+              Coût réel du projet
             </p>
             <ul className="space-y-1.5 text-sm">
               <li className="flex justify-between">
-                <span className="text-muted-foreground">Prix demandé</span>
+                <span className="text-muted-foreground">Prix d&apos;achat</span>
                 <span className="text-foreground">{formatJpy(result.budget.prixAchatJpy)}</span>
               </li>
               <li className="flex justify-between">
@@ -154,22 +214,143 @@ export function OpportunitySection({
                 </span>
               </li>
               <li className="flex justify-between">
-                <span className="text-muted-foreground">Travaux estimés</span>
+                <span className="text-muted-foreground">Travaux</span>
                 <span className="text-foreground">{formatJpy(result.budget.travauxJpy)}</span>
               </li>
+              <li className="flex justify-between">
+                <span className="text-muted-foreground">Marge d&apos;imprévus (scénario prudent)</span>
+                <span className="text-foreground">
+                  {formatJpy(
+                    (result.scenarios.find((s) => s.label === "prudent")?.travauxJpy ?? result.budget.travauxJpy) -
+                      result.budget.travauxJpy,
+                  )}
+                </span>
+              </li>
               <li className="flex justify-between border-t border-border pt-1.5 font-medium">
-                <span className="text-foreground">Projet total estimé</span>
-                <span className="text-foreground">{formatJpy(result.budget.totalProjetJpy)}</span>
+                <span className="text-foreground">Capital initial estimé</span>
+                <span className="text-foreground">
+                  {formatJpy(
+                    result.scenarios.find((s) => s.label === "prudent")?.totalProjetJpy ??
+                      result.budget.totalProjetJpy,
+                  )}
+                </span>
               </li>
               <li className="flex justify-end text-xs text-muted-foreground">
-                soit {formatEur(result.budget.totalProjetEur)}
+                soit{" "}
+                {formatEur(
+                  result.scenarios.find((s) => s.label === "prudent")?.totalProjetEur ??
+                    result.budget.totalProjetEur,
+                )}
               </li>
             </ul>
+          </Card>
 
-            <Separator className="my-4" />
+          {/* 4. Faisabilité budgétaire (budget personnel) */}
+          {result.budgetVerdict && result.feasibility && (
+            <Card className={`border p-6 sm:p-8 ${FEASIBILITY_STYLES[result.feasibility]}`}>
+              <p className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Ton budget
+              </p>
+              <ul className="space-y-1.5 text-sm">
+                <li className="flex justify-between">
+                  <span className="text-muted-foreground">Budget disponible</span>
+                  <span className="text-foreground">
+                    {formatEur(result.budgetVerdict.budgetDisponibleEur)}
+                  </span>
+                </li>
+                <li className="flex justify-between">
+                  <span className="text-muted-foreground">Projet estimé</span>
+                  <span className="text-foreground">
+                    {formatEur(result.budgetVerdict.budgetNecessaireEur)}
+                  </span>
+                </li>
+                <li className="flex justify-between border-t border-border pt-1.5 font-medium">
+                  <span className="text-foreground">
+                    {result.budgetVerdict.margeEur >= 0 ? "Marge restante" : "Manque"}
+                  </span>
+                  <span className="text-foreground">
+                    {formatEur(Math.abs(result.budgetVerdict.margeEur))}
+                  </span>
+                </li>
+              </ul>
+              <p className="mt-4 text-base font-medium text-foreground">
+                {FEASIBILITY_LABELS[result.feasibility]}
+              </p>
+            </Card>
+          )}
 
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          {/* 5. Prix cible / zone de négociation */}
+          {(result.priceTargets.maxAffordablePriceJpy !== null ||
+            result.priceTargets.attractivePriceJpy !== null) && (
+            <Card className="border-border p-6 sm:p-8">
+              <p className="mb-4 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                🎯 Zone de négociation
+              </p>
+              <ul className="space-y-1.5 text-sm">
+                <li className="flex justify-between">
+                  <span className="text-muted-foreground">Prix demandé</span>
+                  <span className="text-foreground">{formatJpy(prixAchatJpy)}</span>
+                </li>
+                {result.priceTargets.attractivePriceJpy !== null && (
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Prix cible (attractif)</span>
+                    <span className="text-foreground">
+                      {formatJpy(result.priceTargets.attractivePriceJpy)}
+                    </span>
+                  </li>
+                )}
+                {result.priceTargets.maxAffordablePriceJpy !== null && (
+                  <li className="flex justify-between">
+                    <span className="text-muted-foreground">Prix maximum conseillé</span>
+                    <span className="text-foreground">
+                      {formatJpy(result.priceTargets.maxAffordablePriceJpy)}
+                    </span>
+                  </li>
+                )}
+              </ul>
+              {result.priceTargets.negotiationMessage && (
+                <p className="mt-4 text-sm text-foreground">
+                  {result.priceTargets.negotiationMessage}
+                </p>
+              )}
+
+              {result.sensitivity.length > 0 && (
+                <>
+                  <Separator className="my-4" />
+                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Si le prix change...
+                  </p>
+                  <div className="space-y-1.5">
+                    {result.sensitivity.map((point) => (
+                      <div key={point.prixJpy} className="flex items-center gap-3 text-sm">
+                        <span className="w-24 shrink-0 text-muted-foreground">
+                          {formatJpy(point.prixJpy)}
+                        </span>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${point.score * 10}%` }}
+                          />
+                        </div>
+                        <span className="w-12 shrink-0 text-right font-medium text-foreground">
+                          {point.score.toFixed(1)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </Card>
+          )}
+
+          {/* 6. Scénarios */}
+          <Card className="border-border p-6 sm:p-8">
+            <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Scénarios travaux
+            </p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Le prix d&apos;annonce n&apos;est pas le coût du projet : les travaux peuvent
+              dépasser l&apos;hypothèse optimiste.
             </p>
             <div className="grid gap-3 sm:grid-cols-3">
               {result.scenarios.map((scenario) => (
@@ -187,14 +368,23 @@ export function OpportunitySection({
                         : "Prudent"}
                   </p>
                   <p className="text-foreground">{formatJpy(scenario.totalProjetJpy)}</p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="mb-1 text-xs text-muted-foreground">
                     soit {formatEur(scenario.totalProjetEur)}
                   </p>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-primary/70"
+                      style={{
+                        width: `${maxSensitivityTotal > 0 ? (scenario.totalProjetJpy / maxSensitivityTotal) * 100 : 0}%`,
+                      }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
           </Card>
 
+          {/* 7. Forces / vigilances */}
           {(result.strengths.length > 0 || result.riskFlags.length > 0) && (
             <div className="grid gap-6 sm:grid-cols-2">
               {result.strengths.length > 0 && (
@@ -215,7 +405,7 @@ export function OpportunitySection({
               {result.riskFlags.length > 0 && (
                 <Card className="border-border p-6">
                   <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Ce qui mérite une vérification
+                    Avant de considérer cette maison comme une bonne affaire
                   </p>
                   <ul className="space-y-2 text-sm">
                     {result.riskFlags.map((flag) => (
@@ -229,6 +419,15 @@ export function OpportunitySection({
               )}
             </div>
           )}
+
+          {/* 8. Confiance */}
+          <Card className="border-border p-6 sm:p-8">
+            <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">Confiance</p>
+            <p className={`mb-2 text-lg font-semibold ${CONFIDENCE_STYLES[result.confidence]}`}>
+              {OPPORTUNITY_CONFIDENCE_LABELS[result.confidence]}
+            </p>
+            <p className="text-sm text-muted-foreground">{result.confidenceExplanation}</p>
+          </Card>
 
           <div className="space-y-2 rounded-md border border-border bg-muted/30 p-4 text-xs text-muted-foreground">
             <p>{OPPORTUNITY_VERIFICATION_REMINDER}</p>

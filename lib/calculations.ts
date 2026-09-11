@@ -66,6 +66,34 @@ export function computeAcquisitionFees(
   };
 }
 
+// Inverse exact de computeAcquisitionFees/computeBudget : au lieu de partir du
+// prix pour calculer le coût total, on part d'un budget cible (JPY) pour
+// retrouver le prix d'achat maximum compatible, à travaux et profil constants.
+// Deux régimes fermés (même seuil que computeAgencyFee), pas de recherche
+// itérative : les deux formules coïncident exactement au seuil de 8 M JPY.
+const MAX_PRICE_ROUNDING_STEP_JPY = 10_000;
+
+export function computeMaxAffordablePriceJpy(
+  budgetCibleJpy: number,
+  profile: BuyerProfile,
+  travauxJpy: number,
+): number | null {
+  const fixedFeesJpy = SHIHO_SHOSHI_JPY + computeLegalSetupFee(profile) + travauxJpy;
+
+  const prixRegimeA = (budgetCibleJpy - AGENCY_FLAT_FEE_JPY - fixedFeesJpy) / (1 + ACQUISITION_TAX_RATE);
+  const rawPrix =
+    prixRegimeA <= AGENCY_FLAT_THRESHOLD_JPY
+      ? prixRegimeA
+      : (budgetCibleJpy - AGENCY_BASE_JPY * (1 + AGENCY_VAT_RATE) - fixedFeesJpy) /
+        (1 + AGENCY_RATE * (1 + AGENCY_VAT_RATE) + ACQUISITION_TAX_RATE);
+
+  if (rawPrix <= 0) return null;
+
+  // Arrondi par défaut vers le bas : un plafond financier sous-estimé légèrement
+  // est plus sûr qu'un plafond surestimé, et évite toute fausse précision.
+  return Math.floor(rawPrix / MAX_PRICE_ROUNDING_STEP_JPY) * MAX_PRICE_ROUNDING_STEP_JPY;
+}
+
 export function computeRenovationBudget(niveauTravaux: RenovationLevel): number {
   return RENOVATION_BUDGET_JPY[niveauTravaux];
 }

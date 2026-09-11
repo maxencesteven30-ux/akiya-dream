@@ -8,6 +8,7 @@ import {
   computeBudgetVerdict,
   computeEstimatedPriceFromSurface,
   computeLegalSetupFee,
+  computeMaxAffordablePriceJpy,
   computeRenovationBudget,
   computeRenovationScenarios,
   computeRiskFlags,
@@ -238,6 +239,48 @@ describe("computeRiskFlags", () => {
     const flags = computeRiskFlags("solo", "leger", SAMPLE_REGION_LOW_RISK, null, 5);
     expect(flags.some((f) => f.key === "isolated-station-distance")).toBe(false);
     expect(flags.some((f) => f.key === "rural-access")).toBe(false);
+  });
+});
+
+describe("computeMaxAffordablePriceJpy", () => {
+  it("régime A (prix ≤ 8M) : retrouve un prix cohérent avec computeBudget", () => {
+    const maxPrice = computeMaxAffordablePriceJpy(10_000_000, "solo", 3_000_000);
+    expect(maxPrice).toBe(6_230_000);
+
+    // Vérifie que ce prix reste bien sous le budget cible, et qu'un cran
+    // au-dessus (10 000 JPY) le dépasserait (borne de l'arrondi par défaut).
+    const budgetAtMax = computeBudget(maxPrice!, "solo", "leger", null);
+    // On recalcule manuellement le total avec les travaux fournis (3M) car
+    // "leger" correspond déjà à 3M dans RENOVATION_BUDGET_JPY.
+    expect(budgetAtMax.totalProjetJpy).toBeLessThanOrEqual(10_000_000);
+
+    const budgetOneStepAbove = computeBudget(maxPrice! + 10_000, "solo", "leger", null);
+    expect(budgetOneStepAbove.totalProjetJpy).toBeGreaterThan(10_000_000);
+  });
+
+  it("régime B (prix > 8M) : bascule de formule cohérente avec computeAcquisitionFees", () => {
+    const maxPrice = computeMaxAffordablePriceJpy(30_000_000, "investisseur", 5_000_000);
+    expect(maxPrice).toBe(22_750_000);
+    expect(maxPrice!).toBeGreaterThan(8_000_000);
+
+    const fees = computeAcquisitionFees(maxPrice!, "investisseur");
+    const total = maxPrice! + fees.total + 5_000_000;
+    expect(total).toBeLessThanOrEqual(30_000_000);
+
+    const feesOneStepAbove = computeAcquisitionFees(maxPrice! + 10_000, "investisseur");
+    const totalOneStepAbove = maxPrice! + 10_000 + feesOneStepAbove.total + 5_000_000;
+    expect(totalOneStepAbove).toBeGreaterThan(30_000_000);
+  });
+
+  it("budget insuffisant : retourne null plutôt qu'un prix négatif", () => {
+    expect(computeMaxAffordablePriceJpy(1_000_000, "solo", 3_000_000)).toBeNull();
+  });
+
+  it("est déterministe et ne produit jamais NaN", () => {
+    const a = computeMaxAffordablePriceJpy(10_000_000, "duo", 2_000_000);
+    const b = computeMaxAffordablePriceJpy(10_000_000, "duo", 2_000_000);
+    expect(a).toBe(b);
+    expect(Number.isNaN(a)).toBe(false);
   });
 });
 

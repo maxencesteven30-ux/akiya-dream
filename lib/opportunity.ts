@@ -1,13 +1,19 @@
 import {
   computeBudget,
   computeBudgetScenarios,
+  computeBudgetVerdict,
+  computeMaxAffordablePriceJpy,
   computeRiskFlags,
+  EUR_JPY_RATE,
   type BudgetBreakdown,
   type BudgetScenario,
+  type BudgetVerdict,
   type RiskFlag,
 } from "@/lib/calculations";
 import { getBuildingEraCode } from "@/lib/building-eras";
+import { formatJpy } from "@/lib/format";
 import type {
+  BudgetVerdictLevel,
   BuyerProfile,
   ListingCondition,
   RealListing,
@@ -225,6 +231,171 @@ function deriveStrengths(
   return strengths;
 }
 
+// -- Confiance : explication distincte du score (section 14) ----------------
+
+function capitalize(s: string): string {
+  return s.length > 0 ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+function joinList(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} et ${items[items.length - 1]}`;
+}
+
+function buildConfidenceExplanation(signals: {
+  hasConstructionYear: boolean;
+  hasSurfaceM2: boolean;
+  hasCondition: boolean;
+  hasRegion: boolean;
+}): string {
+  const known = ["le prix"];
+  if (signals.hasConstructionYear) known.push("l'année");
+  if (signals.hasSurfaceM2) known.push("la surface");
+  if (signals.hasCondition) known.push("l'état");
+  if (signals.hasRegion) known.push("la région");
+
+  const list = capitalize(joinList(known));
+  const allKnown = known.length === 5;
+
+  return allKnown
+    ? `${list} connus. Le niveau de détail disponible est complet pour ce bien.`
+    : `${list} connu${known.length > 1 ? "s" : ""}. Certaines caractéristiques du bien restent inconnues, ce qui limite la fiabilité de la note.`;
+}
+
+// -- Analyse automatique (section 12) : assemblage déterministe -------------
+// Construit une phrase uniquement à partir des sous-scores déjà calculés,
+// aucune génération libre — seulement des règles à seuils fixes.
+
+function generateOpportunityNarrative(subScores: OpportunitySubScore[]): string {
+  const byKey = Object.fromEntries(subScores.map((s) => [s.key, s])) as Partial<
+    Record<OpportunitySubScoreKey, OpportunitySubScore>
+  >;
+  const clauses: string[] = [];
+
+  if (byKey.prix) {
+    clauses.push(
+      byKey.prix.score >= 6.5
+        ? "le prix demandé est inférieur à la référence régionale"
+        : byKey.prix.score <= 3.5
+          ? "le prix demandé est supérieur à la référence régionale"
+          : "le prix demandé est proche de la référence régionale",
+    );
+  }
+
+  if (byKey.travaux) {
+    clauses.push(
+      byKey.travaux.score >= 6.5
+        ? "le niveau de travaux reste compatible avec le prix d'achat"
+        : byKey.travaux.score <= 3.5
+          ? "le coût estimé des travaux réduit fortement l'intérêt économique du projet"
+          : "le coût des travaux représente une part notable du projet",
+    );
+  }
+
+  if (byKey.anciennete && byKey.anciennete.score <= 3) {
+    clauses.push("l'ancienneté du bien constitue un point de vigilance");
+  }
+
+  if (byKey.etat && byKey.etat.score <= 4) {
+    clauses.push("l'état déclaré du bien nécessite des travaux importants");
+  }
+
+  if (clauses.length === 0) {
+    return "Données insuffisantes pour construire une analyse détaillée.";
+  }
+
+  const firstSentence = `${capitalize(clauses.slice(0, 2).join(" et "))}.`;
+  const remaining = clauses.slice(2);
+  const secondSentence = remaining.length > 0 ? `${capitalize(remaining.join(", "))}.` : "";
+
+  return [firstSentence, secondSentence].filter(Boolean).join(" ");
+}
+
+// -- Prix maximum finançable (section 5-6) -----------------------------------
+// Wrapper EUR -> JPY autour de l'inverse financier exact de computeBudget
+// (lib/calculations.ts). Aucune nouvelle règle financière : mêmes constantes,
+// même moteur.
+
+export function computeMaxAffordablePrice(
+  profile: BuyerProfile,
+  travauxJpy: number,
+  capitalDisponibleEur: number,
+  reserveSecuriteEur: number,
+): number | null {
+  const budgetDisponibleEur = capitalDisponibleEur - reserveSecuriteEur;
+  const budgetCibleJpy = budgetDisponibleEur * EUR_JPY_RATE;
+  return computeMaxAffordablePriceJpy(budgetCibleJpy, profile, travauxJpy);
+}
+
+// -- Analyse de sensibilité et prix attractif (section 7-8) ------------------
+// Pas de formule fermée : le score n'est pas garanti monotone en fonction du
+// prix (le sous-score Prix baisse quand le prix augmente, mais le sous-score
+// Travaux augmente puisqu'un même montant de travaux pèse proportionnellement
+// moins face à un prix plus élevé). La méthode la plus robuste et la plus
+// honnête consiste à rejouer le moteur réel (computeOpportunityScore) à
+// plusieurs prix candidats, jamais à inventer une inversion algébrique.
+
+const SENSITIVITY_DEFAULT_DELTAS_PERCENT = [-30, -20, -10, 0, 10, 20, 30];
+const SENSITIVITY_PRICE_FLOOR_JPY = 100_000;
+const SENSITIVITY_ROUNDING_STEP_JPY = 10_000;
+
+export function computePriceSensitivity(
+  input: OpportunityInput,
+  deltasPercent: number[] = SENSITIVITY_DEFAULT_DELTAS_PERCENT,
+): PriceSensitivityPoint[] {
+  const seen = new Set<number>();
+  const points: PriceSensitivityPoint[] = [];
+
+  for (const delta of deltasPercent) {
+    const rawPrice = input.prixAchatJpy * (1 + delta / 100);
+    const priceJpy = Math.max(
+      SENSITIVITY_PRICE_FLOOR_JPY,
+      Math.round(rawPrice / SENSITIVITY_ROUNDING_STEP_JPY) * SENSITIVITY_ROUNDING_STEP_JPY,
+    );
+    if (seen.has(priceJpy)) continue;
+    seen.add(priceJpy);
+
+    const result = computeOpportunityScoreCore({ ...input, prixAchatJpy: priceJpy });
+    points.push({ prixJpy: priceJpy, score: result.score, category: result.category });
+  }
+
+  return points.sort((a, b) => a.prixJpy - b.prixJpy);
+}
+
+const ATTRACTIVE_PRICE_TARGET_SCORE = 7; // seuil "bonne opportunité" (catégorie ≥ bonne)
+const ATTRACTIVE_PRICE_STEP_JPY = 100_000;
+const ATTRACTIVE_PRICE_MIN_RATIO = 0.3;
+
+export function findAttractivePrice(
+  input: OpportunityInput,
+  targetScore: number = ATTRACTIVE_PRICE_TARGET_SCORE,
+  stepJpy: number = ATTRACTIVE_PRICE_STEP_JPY,
+  minRatio: number = ATTRACTIVE_PRICE_MIN_RATIO,
+): number | null {
+  const currentScore = computeOpportunityScoreCore(input).score;
+  if (currentScore >= targetScore) return input.prixAchatJpy;
+
+  const floorJpy = Math.max(SENSITIVITY_PRICE_FLOOR_JPY, input.prixAchatJpy * minRatio);
+
+  for (let price = input.prixAchatJpy - stepJpy; price >= floorJpy; price -= stepJpy) {
+    const result = computeOpportunityScoreCore({ ...input, prixAchatJpy: price });
+    if (result.score >= targetScore) return price;
+  }
+
+  return null;
+}
+
+function buildNegotiationMessage(
+  prixAchatJpy: number,
+  attractivePriceJpy: number | null,
+): string | null {
+  if (attractivePriceJpy === null || attractivePriceJpy >= prixAchatJpy) return null;
+  return (
+    `Une négociation vers ${formatJpy(attractivePriceJpy)} améliorerait sensiblement ` +
+    "l'attractivité financière du projet."
+  );
+}
+
 // -- Assemblage complet -------------------------------------------------------
 
 export interface OpportunityInput {
@@ -233,18 +404,59 @@ export interface OpportunityInput {
   renovationLevel: RenovationLevel;
   region: Region | null;
   listing: RealListing;
+  capitalDisponibleEur?: number | null;
+  reserveSecuriteEur?: number | null;
+}
+
+export interface PriceAnalysis {
+  prixAchatJpy: number;
+  referenceRegionaleJpy: number | null;
+  ecartPercent: number | null;
+}
+
+export type FeasibilityLevel = "compatible" | "tendu" | "insuffisant";
+
+export const FEASIBILITY_LABELS: Record<FeasibilityLevel, string> = {
+  compatible: "🟢 Compatible avec ton budget",
+  tendu: "🟠 Tendu par rapport à ton budget",
+  insuffisant: "🔴 Projet supérieur à ton budget",
+};
+
+function feasibilityFromVerdict(verdict: BudgetVerdictLevel): FeasibilityLevel {
+  if (verdict === "viable") return "compatible";
+  if (verdict === "tendu") return "tendu";
+  return "insuffisant";
+}
+
+export interface PriceSensitivityPoint {
+  prixJpy: number;
+  score: number;
+  category: OpportunityCategory;
+}
+
+export interface PriceTargets {
+  maxAffordablePriceJpy: number | null;
+  attractivePriceJpy: number | null;
+  negotiationMessage: string | null;
 }
 
 export interface OpportunityResult {
   score: number;
   category: OpportunityCategory;
   confidence: OpportunityConfidenceLevel;
+  confidenceExplanation: string;
   subScores: OpportunitySubScore[];
   budget: BudgetBreakdown;
   scenarios: BudgetScenario[];
   riskFlags: RiskFlag[];
   strengths: string[];
   coverageIncomplete: boolean;
+  priceAnalysis: PriceAnalysis;
+  budgetVerdict: BudgetVerdict | null;
+  feasibility: FeasibilityLevel | null;
+  narrative: string;
+  priceTargets: PriceTargets;
+  sensitivity: PriceSensitivityPoint[];
 }
 
 export const OPPORTUNITY_DISCLAIMER =
@@ -272,7 +484,13 @@ export const OPPORTUNITY_VERIFICATION_REMINDER =
   "Vérifie l'état structurel, la toiture, les réseaux, les éventuels travaux non visibles " +
   "et les documents du bien avant toute décision.";
 
-export function computeOpportunityScore(input: OpportunityInput): OpportunityResult {
+type OpportunityCoreResult = Omit<OpportunityResult, "priceTargets" | "sensitivity">;
+
+// Calcul "cœur" : score, sous-scores, budget, faisabilité, narratif. Séparé
+// du calcul public pour permettre à computePriceSensitivity/findAttractivePrice
+// de rejouer ce cœur à différents prix SANS déclencher récursivement le calcul
+// de sensibilité lui-même (qui, sinon, se rappellerait indéfiniment).
+function computeOpportunityScoreCore(input: OpportunityInput): OpportunityCoreResult {
   const { prixAchatJpy, profile, renovationLevel, region, listing } = input;
 
   const refinement =
@@ -296,13 +514,16 @@ export function computeOpportunityScore(input: OpportunityInput): OpportunityRes
   const totalWeight = subScores.reduce((sum, s) => sum + s.weight, 0);
   const weightedSum = subScores.reduce((sum, s) => sum + s.score * s.weight, 0);
   const score = totalWeight > 0 ? round1(clamp(weightedSum / totalWeight, 0, 10)) : 0;
+  const category = categorizeOpportunityScore(score);
 
-  const confidence = computeConfidenceLevel({
+  const confidenceSignals = {
     hasConstructionYear: listing.constructionYear !== null,
     hasSurfaceM2: listing.surfaceM2 !== null,
     hasCondition: listing.condition !== "unknown",
     hasRegion: region !== null,
-  });
+  };
+  const confidence = computeConfidenceLevel(confidenceSignals);
+  const confidenceExplanation = buildConfidenceExplanation(confidenceSignals);
 
   const riskFlags = computeRiskFlags(
     profile,
@@ -314,15 +535,67 @@ export function computeOpportunityScore(input: OpportunityInput): OpportunityRes
 
   const strengths = deriveStrengths(subScores, prixAchatJpy, region);
 
+  const priceAnalysis: PriceAnalysis = {
+    prixAchatJpy,
+    referenceRegionaleJpy: region?.medianPriceJpy ?? null,
+    ecartPercent:
+      region && region.medianPriceJpy
+        ? Math.round(((prixAchatJpy - region.medianPriceJpy) / region.medianPriceJpy) * 100)
+        : null,
+  };
+
+  const budgetVerdict =
+    input.capitalDisponibleEur != null && input.reserveSecuriteEur != null
+      ? computeBudgetVerdict(budget.totalProjetEur, input.capitalDisponibleEur, input.reserveSecuriteEur)
+      : null;
+  const feasibility = budgetVerdict ? feasibilityFromVerdict(budgetVerdict.verdict) : null;
+
+  const narrative = generateOpportunityNarrative(subScores);
+
   return {
     score,
-    category: categorizeOpportunityScore(score),
+    category,
     confidence,
+    confidenceExplanation,
     subScores,
     budget,
     scenarios,
     riskFlags,
     strengths,
     coverageIncomplete: subScores.length < candidates.length,
+    priceAnalysis,
+    budgetVerdict,
+    feasibility,
+    narrative,
+  };
+}
+
+export function computeOpportunityScore(input: OpportunityInput): OpportunityResult {
+  const core = computeOpportunityScoreCore(input);
+
+  const sensitivity = computePriceSensitivity(input);
+
+  const travauxJpy = core.budget.travauxJpy;
+  const maxAffordablePriceJpy =
+    input.capitalDisponibleEur != null && input.reserveSecuriteEur != null
+      ? computeMaxAffordablePrice(
+          input.profile,
+          travauxJpy,
+          input.capitalDisponibleEur,
+          input.reserveSecuriteEur,
+        )
+      : null;
+
+  const attractivePriceJpy = findAttractivePrice(input);
+  const negotiationMessage = buildNegotiationMessage(input.prixAchatJpy, attractivePriceJpy);
+
+  return {
+    ...core,
+    priceTargets: {
+      maxAffordablePriceJpy,
+      attractivePriceJpy,
+      negotiationMessage,
+    },
+    sensitivity,
   };
 }
