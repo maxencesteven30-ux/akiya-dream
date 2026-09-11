@@ -22,6 +22,7 @@ import { DueDiligenceSection } from "@/components/simulateur/due-diligence-secti
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { HistorySection } from "@/components/simulateur/history-section";
 import { ProjectDashboardSection } from "@/components/simulateur/project-dashboard-section";
+import { DocumentsSection } from "@/components/simulateur/documents-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
 import { ExportSection } from "@/components/simulateur/export-section";
@@ -82,6 +83,7 @@ const DEFAULT_STATE: SimulatorState = {
   includeNeighborhoodAssociation: true,
   dueDiligence: createEmptyChecklist(),
   history: [],
+  currentProjectId: null,
 };
 
 export function Simulateur() {
@@ -365,8 +367,15 @@ export function Simulateur() {
       // Même logique pour l'historique des hypothèses : celui d'un autre
       // bien n'a pas de sens ici.
       history: [],
+      // Ce projet est bien celui de l'utilisateur (chargé via "Mes projets
+      // sauvegardés", filtré par RLS) : les pièces jointes (Phase O)
+      // peuvent s'y attacher directement.
+      currentProjectId: project.id,
     }));
   };
+
+  const handleProjectSaved = (project: PersistedProject) =>
+    setState((prev) => ({ ...prev, currentProjectId: project.id }));
 
   if (loading) {
     return <SimulateurSkeleton />;
@@ -388,7 +397,15 @@ export function Simulateur() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-10 px-6 py-10 sm:space-y-12 sm:px-8 sm:py-14">
-      <SavedProjectsSection currentProject={currentProjectInput} onLoad={loadPersistedProject} />
+      <SavedProjectsSection
+        currentProject={currentProjectInput}
+        onLoad={loadPersistedProject}
+        onSaved={handleProjectSaved}
+      />
+
+      {state.currentProjectId !== null && (
+        <DocumentsSection projectId={state.currentProjectId} />
+      )}
 
       <ProfilSection value={state.profile} onChange={setProfile} />
 

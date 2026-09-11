@@ -323,7 +323,7 @@ function mapProjectRow(row: ProjectRow): PersistedProject {
 // ensureAnonymousSession() retourne null : on lève une erreur explicite
 // plutôt que d'échouer silencieusement, car sauvegarder est une action
 // volontaire de l'utilisateur (contrairement au chargement des régions).
-async function requireUserId(): Promise<string> {
+export async function requireUserId(): Promise<string> {
   const userId = await ensureAnonymousSession();
   if (!userId) {
     throw new Error(

@@ -18,6 +18,7 @@ import type { NewProjectInput, PersistedProject } from "@/lib/types";
 interface SavedProjectsSectionProps {
   currentProject: NewProjectInput | null;
   onLoad: (project: PersistedProject) => void;
+  onSaved?: (project: PersistedProject) => void;
 }
 
 const PROFILE_LABELS = {
@@ -26,7 +27,7 @@ const PROFILE_LABELS = {
   investisseur: "Investisseur",
 };
 
-export function SavedProjectsSection({ currentProject, onLoad }: SavedProjectsSectionProps) {
+export function SavedProjectsSection({ currentProject, onLoad, onSaved }: SavedProjectsSectionProps) {
   const [open, setOpen] = useState(false);
   const [projects, setProjects] = useState<PersistedProject[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -67,6 +68,7 @@ export function SavedProjectsSection({ currentProject, onLoad }: SavedProjectsSe
       .then((saved) => {
         setProjects((prev) => [saved, ...prev]);
         setLoaded(true);
+        onSaved?.(saved);
       })
       .catch((err: unknown) => {
         setSaveError(err instanceof Error ? err.message : "Erreur inconnue.");

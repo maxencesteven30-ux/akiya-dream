@@ -126,6 +126,10 @@ export interface SimulatorState {
   includeNeighborhoodAssociation: boolean;
   dueDiligence: DueDiligenceState;
   history: HistoryEntry[];
+  // Id Supabase du dernier projet sauvegardé ou chargé dans cette session,
+  // null tant qu'aucune sauvegarde n'a eu lieu. Les pièces jointes (Phase O)
+  // ne peuvent être attachées qu'à un projet possédant un id.
+  currentProjectId: number | null;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";
