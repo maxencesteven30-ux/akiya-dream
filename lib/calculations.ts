@@ -1,6 +1,8 @@
 import { EUR_JPY_RATE, jpyToEur } from "@/lib/data";
 import { getBuildingEraForYear } from "@/lib/building-eras";
+import { getAgencyServiceMidpoint } from "@/lib/agency-services";
 import type {
+  AccompanimentLevel,
   BudgetVerdictLevel,
   BuildingEraCode,
   BuyerProfile,
@@ -40,29 +42,58 @@ export function computeLegalSetupFee(profile: BuyerProfile): number {
   return 0;
 }
 
+// Niveau d'accompagnement pour l'achat (frais d'agence spécialisée, en plus
+// du courtage légal déjà couvert par computeAgencyFee). Montants = milieu de
+// la fourchette min/max de data/agency_services.json (AGENCY_CURATION,
+// AGENCY_TURNKEY) : une hypothèse de gestion explicite, pas une donnée
+// mesurée pour un dossier précis — cohérent avec le principe déjà appliqué
+// aux forfaits travaux par niveau. Le type lui-même vit dans lib/types.ts
+// (même pattern que RenovationLevel/BuyerProfile).
+const ACCOMPANIMENT_FEE_JPY: Record<AccompanimentLevel, number> = {
+  autonome: 0,
+  curation: getAgencyServiceMidpoint("AGENCY_CURATION"),
+  cle_en_main: getAgencyServiceMidpoint("AGENCY_TURNKEY"),
+};
+
+export function computeAccompanimentFee(level: AccompanimentLevel): number {
+  return ACCOMPANIMENT_FEE_JPY[level];
+}
+
+// Frais de traduction/interprétariat : optionnel (case à cocher côté UI),
+// jamais ajouté implicitement — milieu de fourchette de TRANSLATION_SRV.
+const TRANSLATION_FEE_JPY = getAgencyServiceMidpoint("TRANSLATION_SRV");
+
 export interface AcquisitionFees {
   agence: number;
   juriste: number;
   taxes: number;
   montageJuridique: number;
+  accompagnement: number;
+  traduction: number;
   total: number;
 }
 
 export function computeAcquisitionFees(
   prixAchatJpy: number,
   profile: BuyerProfile,
+  accompanimentLevel: AccompanimentLevel = "autonome",
+  needsTranslation = false,
 ): AcquisitionFees {
   const agence = computeAgencyFee(prixAchatJpy);
   const juriste = SHIHO_SHOSHI_JPY;
   const taxes = prixAchatJpy * ACQUISITION_TAX_RATE;
   const montageJuridique = computeLegalSetupFee(profile);
+  const accompagnement = computeAccompanimentFee(accompanimentLevel);
+  const traduction = needsTranslation ? TRANSLATION_FEE_JPY : 0;
 
   return {
     agence,
     juriste,
     taxes,
     montageJuridique,
-    total: agence + juriste + taxes + montageJuridique,
+    accompagnement,
+    traduction,
+    total: agence + juriste + taxes + montageJuridique + accompagnement + traduction,
   };
 }
 
@@ -77,8 +108,10 @@ export function computeMaxAffordablePriceJpy(
   budgetCibleJpy: number,
   profile: BuyerProfile,
   travauxJpy: number,
+  extraFixedFeesJpy = 0,
 ): number | null {
-  const fixedFeesJpy = SHIHO_SHOSHI_JPY + computeLegalSetupFee(profile) + travauxJpy;
+  const fixedFeesJpy =
+    SHIHO_SHOSHI_JPY + computeLegalSetupFee(profile) + travauxJpy + extraFixedFeesJpy;
 
   const prixRegimeA = (budgetCibleJpy - AGENCY_FLAT_FEE_JPY - fixedFeesJpy) / (1 + ACQUISITION_TAX_RATE);
   const rawPrix =
@@ -163,8 +196,15 @@ export function computeBudget(
   profile: BuyerProfile,
   niveauTravaux: RenovationLevel,
   refinement?: RenovationRefinement | null,
+  accompanimentLevel: AccompanimentLevel = "autonome",
+  needsTranslation = false,
 ): BudgetBreakdown {
-  const acquisitionFees = computeAcquisitionFees(prixAchatJpy, profile);
+  const acquisitionFees = computeAcquisitionFees(
+    prixAchatJpy,
+    profile,
+    accompanimentLevel,
+    needsTranslation,
+  );
   const surfaceBasedRenovation = refinement
     ? computeSurfaceBasedRenovation(refinement.constructionYear, refinement.surfaceM2)
     : null;
@@ -230,8 +270,15 @@ export function computeBudgetScenarios(
   niveauTravaux: RenovationLevel,
   refinement?: RenovationRefinement | null,
   subsidiesJpy = 0,
+  accompanimentLevel: AccompanimentLevel = "autonome",
+  needsTranslation = false,
 ): BudgetScenario[] {
-  const acquisitionFees = computeAcquisitionFees(prixAchatJpy, profile);
+  const acquisitionFees = computeAcquisitionFees(
+    prixAchatJpy,
+    profile,
+    accompanimentLevel,
+    needsTranslation,
+  );
   const totalAcquisitionJpy = prixAchatJpy + acquisitionFees.total;
   const baseTravauxJpy = refinement
     ? computeSurfaceBasedRenovation(refinement.constructionYear, refinement.surfaceM2).totalJpy

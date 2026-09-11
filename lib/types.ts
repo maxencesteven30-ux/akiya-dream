@@ -74,6 +74,8 @@ export interface RealListing {
   condition: ListingCondition;
 }
 
+export type AccompanimentLevel = "autonome" | "curation" | "cle_en_main";
+
 export interface SimulatorState {
   profile: BuyerProfile | null;
   housePriceJpy: number;
@@ -82,6 +84,8 @@ export interface SimulatorState {
   capitalDisponibleEur: number | null;
   reserveSecuriteEur: number | null;
   realListing: RealListing | null;
+  accompanimentLevel: AccompanimentLevel;
+  needsTranslation: boolean;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

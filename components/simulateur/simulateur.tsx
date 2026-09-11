@@ -23,6 +23,7 @@ import { SavedProjectsSection } from "@/components/simulateur/saved-projects-sec
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import type {
+  AccompanimentLevel,
   BuyerProfile,
   NewProjectInput,
   PersistedProject,
@@ -45,6 +46,8 @@ const DEFAULT_STATE: SimulatorState = {
   capitalDisponibleEur: null,
   reserveSecuriteEur: null,
   realListing: null,
+  accompanimentLevel: "autonome",
+  needsTranslation: false,
 };
 
 export function Simulateur() {
@@ -136,6 +139,10 @@ export function Simulateur() {
     setState((prev) => ({ ...prev, reserveSecuriteEur }));
   const setRealListing = (realListing: RealListing | null) =>
     setState((prev) => ({ ...prev, realListing }));
+  const setAccompanimentLevel = (accompanimentLevel: AccompanimentLevel) =>
+    setState((prev) => ({ ...prev, accompanimentLevel }));
+  const setNeedsTranslation = (needsTranslation: boolean) =>
+    setState((prev) => ({ ...prev, needsTranslation }));
 
   const addToComparateur = () => {
     if (!state.profile || !state.renovationLevel) return;
@@ -183,7 +190,7 @@ export function Simulateur() {
       : null;
 
   const loadPersistedProject = (project: PersistedProject) => {
-    setState({
+    setState((prev) => ({
       profile: project.profile,
       housePriceJpy: project.housePriceJpy,
       prefecture: project.prefecture,
@@ -191,7 +198,10 @@ export function Simulateur() {
       capitalDisponibleEur: project.capitalDisponibleEur,
       reserveSecuriteEur: project.reserveSecuriteEur,
       realListing: project.realListing,
-    });
+      // Pas encore persistés côté Supabase : on conserve la sélection en cours.
+      accompanimentLevel: prev.accompanimentLevel,
+      needsTranslation: prev.needsTranslation,
+    }));
   };
 
   if (loading) {
@@ -243,6 +253,10 @@ export function Simulateur() {
               onPrefectureChange={setPrefecture}
               renovationLevel={state.renovationLevel}
               onRenovationLevelChange={setRenovationLevel}
+              accompanimentLevel={state.accompanimentLevel}
+              onAccompanimentLevelChange={setAccompanimentLevel}
+              needsTranslation={state.needsTranslation}
+              onNeedsTranslationChange={setNeedsTranslation}
             />
             <RealListingSection
               realListing={state.realListing}
@@ -264,6 +278,8 @@ export function Simulateur() {
               renovationLevel={state.renovationLevel}
               realListing={state.realListing}
               subsidiesJpy={subsidiesJpy}
+              accompanimentLevel={state.accompanimentLevel}
+              needsTranslation={state.needsTranslation}
             />
             <Separator />
             <BudgetSection
@@ -275,6 +291,8 @@ export function Simulateur() {
               reserveSecuriteEur={state.reserveSecuriteEur}
               onReserveChange={setReserveSecuriteEur}
               realListing={state.realListing}
+              accompanimentLevel={state.accompanimentLevel}
+              needsTranslation={state.needsTranslation}
             />
 
             <Separator />

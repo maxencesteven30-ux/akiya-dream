@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateAnnualCosts,
+  computeAccompanimentFee,
   computeAcquisitionFees,
   computeAgencyFee,
   computeBudget,
@@ -79,6 +80,44 @@ describe("computeAcquisitionFees", () => {
     expect(fees.montageJuridique).toBe(250_000);
     expect(fees.total).toBeCloseTo(1_168_000, 6);
   });
+
+  it("sans accompagnement ni traduction (défaut), accompagnement et traduction sont à 0 (non-régression)", () => {
+    const fees = computeAcquisitionFees(3_000_000, "solo");
+    expect(fees.accompagnement).toBe(0);
+    expect(fees.traduction).toBe(0);
+    expect(fees.total).toBeCloseTo(615_000, 6);
+  });
+
+  it("ajoute le forfait curation (milieu de fourchette 200k-300k)", () => {
+    const fees = computeAcquisitionFees(3_000_000, "solo", "curation");
+    expect(fees.accompagnement).toBe(250_000);
+    expect(fees.total).toBeCloseTo(615_000 + 250_000, 6);
+  });
+
+  it("ajoute le forfait clé en main (milieu de fourchette 500k-1M)", () => {
+    const fees = computeAcquisitionFees(3_000_000, "solo", "cle_en_main");
+    expect(fees.accompagnement).toBe(750_000);
+    expect(fees.total).toBeCloseTo(615_000 + 750_000, 6);
+  });
+
+  it("ajoute la traduction uniquement si explicitement demandée", () => {
+    const withoutTranslation = computeAcquisitionFees(3_000_000, "solo", "autonome", false);
+    const withTranslation = computeAcquisitionFees(3_000_000, "solo", "autonome", true);
+    expect(withoutTranslation.traduction).toBe(0);
+    expect(withTranslation.traduction).toBeGreaterThan(0);
+    expect(withTranslation.total).toBeCloseTo(
+      withoutTranslation.total + withTranslation.traduction,
+      6,
+    );
+  });
+});
+
+describe("computeAccompanimentFee", () => {
+  it("retourne les 3 niveaux attendus, déterministes", () => {
+    expect(computeAccompanimentFee("autonome")).toBe(0);
+    expect(computeAccompanimentFee("curation")).toBe(250_000);
+    expect(computeAccompanimentFee("cle_en_main")).toBe(750_000);
+  });
 });
 
 describe("computeRenovationBudget", () => {
@@ -101,6 +140,25 @@ describe("computeBudget", () => {
     const budget = computeBudget(9_000_000, "investisseur", "lourd");
     // 9_000_000 (prix) + 1_168_000 (frais) + 15_000_000 (travaux)
     expect(budget.totalProjetJpy).toBeCloseTo(25_168_000, 6);
+  });
+
+  it("intègre le forfait clé en main et la traduction dans le total", () => {
+    const sansAccompagnement = computeBudget(3_000_000, "solo", "leger");
+    const avecAccompagnement = computeBudget(
+      3_000_000,
+      "solo",
+      "leger",
+      null,
+      "cle_en_main",
+      true,
+    );
+    const surcout =
+      avecAccompagnement.acquisitionFees.accompagnement +
+      avecAccompagnement.acquisitionFees.traduction;
+    expect(avecAccompagnement.totalProjetJpy).toBeCloseTo(
+      sansAccompagnement.totalProjetJpy + surcout,
+      6,
+    );
   });
 });
 
@@ -301,6 +359,16 @@ describe("computeMaxAffordablePriceJpy", () => {
     const b = computeMaxAffordablePriceJpy(10_000_000, "duo", 2_000_000);
     expect(a).toBe(b);
     expect(Number.isNaN(a)).toBe(false);
+  });
+
+  it("des frais fixes additionnels (accompagnement/traduction) réduisent le prix maximum", () => {
+    const sansExtra = computeMaxAffordablePriceJpy(10_000_000, "solo", 3_000_000);
+    const avecExtra = computeMaxAffordablePriceJpy(10_000_000, "solo", 3_000_000, 850_000);
+    expect(avecExtra!).toBeLessThan(sansExtra!);
+    // La réduction du prix maximum doit être proche de 850 000/(1+taxe),
+    // à l'arrondi de la fonction près (deux arrondis à 10 000 JPY cumulés).
+    const expectedDelta = 850_000 / (1 + 0.045);
+    expect(Math.abs(sansExtra! - avecExtra! - expectedDelta)).toBeLessThan(20_000);
   });
 });
 

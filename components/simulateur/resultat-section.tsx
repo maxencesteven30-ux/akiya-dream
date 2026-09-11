@@ -31,7 +31,13 @@ import type { ScenarioLabel } from "@/lib/calculations";
 import { Money } from "@/components/simulateur/money";
 import { jpyToEur } from "@/lib/data";
 import { formatEur, formatJpy } from "@/lib/format";
-import type { BuyerProfile, RealListing, Region, RenovationLevel } from "@/lib/types";
+import type {
+  AccompanimentLevel,
+  BuyerProfile,
+  RealListing,
+  Region,
+  RenovationLevel,
+} from "@/lib/types";
 
 interface ResultatSectionProps {
   housePriceJpy: number;
@@ -40,11 +46,14 @@ interface ResultatSectionProps {
   renovationLevel: RenovationLevel | null;
   realListing: RealListing | null;
   subsidiesJpy?: number;
+  accompanimentLevel?: AccompanimentLevel;
+  needsTranslation?: boolean;
 }
 
 const SEGMENT_COLORS = {
   maison: "#D9D3C7",
   acquisition: "#3D3935",
+  accompagnement: "#8A6D3B",
   travaux: "#A0522D",
 } as const;
 
@@ -55,6 +64,8 @@ export function ResultatSection({
   renovationLevel,
   realListing,
   subsidiesJpy = 0,
+  accompanimentLevel = "autonome",
+  needsTranslation = false,
 }: ResultatSectionProps) {
   const ready = Boolean(profile && region && renovationLevel);
 
@@ -68,16 +79,26 @@ export function ResultatSection({
 
   const budget = useMemo(() => {
     if (!profile || !renovationLevel) return null;
-    return computeBudget(housePriceJpy, profile, renovationLevel, refinement);
-  }, [housePriceJpy, profile, renovationLevel, refinement]);
+    return computeBudget(
+      housePriceJpy,
+      profile,
+      renovationLevel,
+      refinement,
+      accompanimentLevel,
+      needsTranslation,
+    );
+  }, [housePriceJpy, profile, renovationLevel, refinement, accompanimentLevel, needsTranslation]);
 
   const chartData = useMemo(() => {
     if (!budget) return [];
+    const accompagnement =
+      budget.acquisitionFees.accompagnement + budget.acquisitionFees.traduction;
     return [
       {
         name: "Budget",
         maison: budget.prixAchatJpy,
-        acquisition: budget.acquisitionFees.total,
+        acquisition: budget.acquisitionFees.total - accompagnement,
+        accompagnement,
         travaux: budget.travauxJpy,
       },
     ];
@@ -90,8 +111,24 @@ export function ResultatSection({
 
   const scenarios = useMemo(() => {
     if (!profile || !renovationLevel) return null;
-    return computeBudgetScenarios(housePriceJpy, profile, renovationLevel, refinement, subsidiesJpy);
-  }, [housePriceJpy, profile, renovationLevel, refinement, subsidiesJpy]);
+    return computeBudgetScenarios(
+      housePriceJpy,
+      profile,
+      renovationLevel,
+      refinement,
+      subsidiesJpy,
+      accompanimentLevel,
+      needsTranslation,
+    );
+  }, [
+    housePriceJpy,
+    profile,
+    renovationLevel,
+    refinement,
+    subsidiesJpy,
+    accompanimentLevel,
+    needsTranslation,
+  ]);
 
   const riskFlags = useMemo(() => {
     if (!profile || !renovationLevel) return [];
@@ -194,6 +231,9 @@ export function ResultatSection({
                 <Bar dataKey="acquisition" stackId="budget" fill={SEGMENT_COLORS.acquisition}>
                   <Cell fill={SEGMENT_COLORS.acquisition} />
                 </Bar>
+                <Bar dataKey="accompagnement" stackId="budget" fill={SEGMENT_COLORS.accompagnement}>
+                  <Cell fill={SEGMENT_COLORS.accompagnement} />
+                </Bar>
                 <Bar dataKey="travaux" stackId="budget" fill={SEGMENT_COLORS.travaux}>
                   <Cell fill={SEGMENT_COLORS.travaux} stroke="var(--border)" strokeWidth={1} />
                 </Bar>
@@ -223,7 +263,8 @@ export function ResultatSection({
 
 const SEGMENT_LABELS = {
   maison: "Prix de la maison",
-  acquisition: "Frais d'acquisition",
+  acquisition: "Frais d'acquisition & juridiques",
+  accompagnement: "Accompagnement & traduction",
   travaux: "Travaux",
 } as const;
 
@@ -269,13 +310,18 @@ function ChartTooltip({
 }
 
 function Legend({ budget }: { budget: ReturnType<typeof computeBudget> }) {
+  const accompagnement =
+    budget.acquisitionFees.accompagnement + budget.acquisitionFees.traduction;
   const items = [
     { key: "maison", label: SEGMENT_LABELS.maison, value: budget.prixAchatJpy },
     {
       key: "acquisition",
       label: SEGMENT_LABELS.acquisition,
-      value: budget.acquisitionFees.total,
+      value: budget.acquisitionFees.total - accompagnement,
     },
+    ...(accompagnement > 0
+      ? [{ key: "accompagnement" as const, label: SEGMENT_LABELS.accompagnement, value: accompagnement }]
+      : []),
     { key: "travaux", label: SEGMENT_LABELS.travaux, value: budget.travauxJpy },
   ] as const;
 
@@ -455,6 +501,12 @@ function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> 
     { label: "Shihō shoshi (juriste)", value: budget.acquisitionFees.juriste },
     { label: "Taxes (acquisition + enregistrement)", value: budget.acquisitionFees.taxes },
     { label: "Montage juridique", value: budget.acquisitionFees.montageJuridique },
+    ...(budget.acquisitionFees.accompagnement > 0
+      ? [{ label: "Accompagnement (agence spécialisée)", value: budget.acquisitionFees.accompagnement }]
+      : []),
+    ...(budget.acquisitionFees.traduction > 0
+      ? [{ label: "Traduction / interprétariat", value: budget.acquisitionFees.traduction }]
+      : []),
     ...(surfaceBased
       ? [
           { label: "Isolation (au m², selon l'ère du bâtiment)", value: surfaceBased.isolationJpy },

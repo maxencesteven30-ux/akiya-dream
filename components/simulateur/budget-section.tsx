@@ -7,7 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { computeBudget, computeBudgetVerdict } from "@/lib/calculations";
 import { formatEur } from "@/lib/format";
-import type { BudgetVerdictLevel, BuyerProfile, RealListing, RenovationLevel } from "@/lib/types";
+import type {
+  AccompanimentLevel,
+  BudgetVerdictLevel,
+  BuyerProfile,
+  RealListing,
+  RenovationLevel,
+} from "@/lib/types";
 
 interface BudgetSectionProps {
   housePriceJpy: number;
@@ -18,6 +24,8 @@ interface BudgetSectionProps {
   reserveSecuriteEur: number | null;
   onReserveChange: (value: number | null) => void;
   realListing: RealListing | null;
+  accompanimentLevel?: AccompanimentLevel;
+  needsTranslation?: boolean;
 }
 
 const VERDICT_LABELS: Record<BudgetVerdictLevel, string> = {
@@ -47,6 +55,8 @@ export function BudgetSection({
   reserveSecuriteEur,
   onReserveChange,
   realListing,
+  accompanimentLevel = "autonome",
+  needsTranslation = false,
 }: BudgetSectionProps) {
   const refinement = useMemo(() => {
     if (!realListing?.constructionYear || !realListing?.surfaceM2) return null;
@@ -57,8 +67,16 @@ export function BudgetSection({
   }, [realListing]);
 
   const totalProjetEur = useMemo(
-    () => computeBudget(housePriceJpy, profile, renovationLevel, refinement).totalProjetEur,
-    [housePriceJpy, profile, renovationLevel, refinement],
+    () =>
+      computeBudget(
+        housePriceJpy,
+        profile,
+        renovationLevel,
+        refinement,
+        accompanimentLevel,
+        needsTranslation,
+      ).totalProjetEur,
+    [housePriceJpy, profile, renovationLevel, refinement, accompanimentLevel, needsTranslation],
   );
 
   const verdict = useMemo(() => {

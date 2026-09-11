@@ -1,0 +1,47 @@
+[
+  {
+    "serviceId": "AGENCY_LEGAL",
+    "providerCategory": "Agence Locale (Takken)",
+    "serviceName": "Frais de courtage légaux (Standard)",
+    "costType": "Pourcentage + Fixe",
+    "priceMinJpy": 0,
+    "priceMaxJpy": 330000,
+    "description": "Plafond strict du MLIT : 3% du prix + 60 000 JPY + 10% TVA pour les biens > 8M JPY. Pour les Akiya ≤ 8M JPY, application de l'exception légale low-price : forfait maximum de 330 000 JPY TTC. Ne couvre que la transaction brute en japonais."
+  },
+  {
+    "serviceId": "AGENCY_CURATION",
+    "providerCategory": "Agence Spécialisée (ex: Akiya & Inaka)",
+    "serviceName": "Service de curation et filtrage amont",
+    "costType": "Forfait",
+    "priceMinJpy": 200000,
+    "priceMaxJpy": 300000,
+    "description": "Fournit une sélection initiale de biens vérifiés (titres, état général) avec un accompagnement à la recherche sur-mesure pour acheteurs étrangers non-résidents avant d'engager un déplacement."
+  },
+  {
+    "serviceId": "AGENCY_TURNKEY",
+    "providerCategory": "Agence Globale (ex: Akiya Air / Plateforme Clé en main)",
+    "serviceName": "Mandatement complet / Représentation acheteur",
+    "costType": "Pourcentage ou Forfait",
+    "priceMinJpy": 500000,
+    "priceMaxJpy": 1000000,
+    "description": "Prise en charge intégrale de A à Z : recherche, négociation en japonais, visites virtuelles ou physiques déléguées, coordination du Shihō shoshi, gestion des services (eau, électricité) et closing à distance sans déplacement obligatoire."
+  },
+  {
+    "serviceId": "LEGAL_SCLEM",
+    "providerCategory": "Shihō shoshi (Juriste Foncier)",
+    "serviceName": "Honoraires d'enregistrement et actes",
+    "costType": "Forfait / Variable",
+    "priceMinJpy": 100000,
+    "priceMaxJpy": 300000,
+    "description": "Équivalent indispensable du notaire pour la transaction foncière. Rédige, vérifie le titre de propriété au Bureau des affaires juridiques et valide le transfert de propriété."
+  },
+  {
+    "serviceId": "TRANSLATION_SRV",
+    "providerCategory": "Traducteur / Interprète Assermenté",
+    "serviceName": "Traduction de documents & Assistance",
+    "costType": "Forfait / Heure",
+    "priceMinJpy": 50000,
+    "priceMaxJpy": 200000,
+    "description": "Traduction officielle assermentée en japonais des pièces d'identité, statuts de structure (SCI/GK), contrats et présence d'un interprète bilingue lors des réunions avec les mairies ou le Shihō shoshi."
+  }
+]
