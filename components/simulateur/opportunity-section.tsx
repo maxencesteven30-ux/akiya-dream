@@ -18,6 +18,8 @@ import {
   type OpportunityCategory,
   type OpportunityConfidenceLevel,
 } from "@/lib/opportunity";
+import { Money } from "@/components/simulateur/money";
+import { jpyToEur } from "@/lib/data";
 import { formatEur, formatJpy } from "@/lib/format";
 import type { BuyerProfile, RealListing, Region, RenovationLevel } from "@/lib/types";
 
@@ -148,15 +150,16 @@ export function OpportunitySection({
             <ul className="mb-4 space-y-1.5 text-sm">
               <li className="flex justify-between">
                 <span className="text-muted-foreground">Prix demandé</span>
-                <span className="text-foreground">{formatJpy(result.priceAnalysis.prixAchatJpy)}</span>
+                <Money jpy={result.priceAnalysis.prixAchatJpy} className="text-foreground" />
               </li>
               {result.priceAnalysis.referenceRegionaleJpy !== null ? (
                 <>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Référence régionale</span>
-                    <span className="text-foreground">
-                      {formatJpy(result.priceAnalysis.referenceRegionaleJpy)}
-                    </span>
+                    <Money
+                      jpy={result.priceAnalysis.referenceRegionaleJpy}
+                      className="text-foreground"
+                    />
                   </li>
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Écart</span>
@@ -205,42 +208,35 @@ export function OpportunitySection({
             <ul className="space-y-1.5 text-sm">
               <li className="flex justify-between">
                 <span className="text-muted-foreground">Prix d&apos;achat</span>
-                <span className="text-foreground">{formatJpy(result.budget.prixAchatJpy)}</span>
+                <Money jpy={result.budget.prixAchatJpy} className="text-foreground" />
               </li>
               <li className="flex justify-between">
                 <span className="text-muted-foreground">Frais d&apos;acquisition</span>
-                <span className="text-foreground">
-                  {formatJpy(result.budget.acquisitionFees.total)}
-                </span>
+                <Money jpy={result.budget.acquisitionFees.total} className="text-foreground" />
               </li>
               <li className="flex justify-between">
                 <span className="text-muted-foreground">Travaux</span>
-                <span className="text-foreground">{formatJpy(result.budget.travauxJpy)}</span>
+                <Money jpy={result.budget.travauxJpy} className="text-foreground" />
               </li>
               <li className="flex justify-between">
                 <span className="text-muted-foreground">Marge d&apos;imprévus (scénario prudent)</span>
-                <span className="text-foreground">
-                  {formatJpy(
-                    (result.scenarios.find((s) => s.label === "prudent")?.travauxJpy ?? result.budget.travauxJpy) -
-                      result.budget.travauxJpy,
-                  )}
-                </span>
+                <Money
+                  jpy={
+                    (result.scenarios.find((s) => s.label === "prudent")?.travauxJpy ??
+                      result.budget.travauxJpy) - result.budget.travauxJpy
+                  }
+                  className="text-foreground"
+                />
               </li>
               <li className="flex justify-between border-t border-border pt-1.5 font-medium">
                 <span className="text-foreground">Capital initial estimé</span>
-                <span className="text-foreground">
-                  {formatJpy(
+                <Money
+                  jpy={
                     result.scenarios.find((s) => s.label === "prudent")?.totalProjetJpy ??
-                      result.budget.totalProjetJpy,
-                  )}
-                </span>
-              </li>
-              <li className="flex justify-end text-xs text-muted-foreground">
-                soit{" "}
-                {formatEur(
-                  result.scenarios.find((s) => s.label === "prudent")?.totalProjetEur ??
-                    result.budget.totalProjetEur,
-                )}
+                    result.budget.totalProjetJpy
+                  }
+                  className="text-foreground"
+                />
               </li>
             </ul>
           </Card>
@@ -289,22 +285,24 @@ export function OpportunitySection({
               <ul className="space-y-1.5 text-sm">
                 <li className="flex justify-between">
                   <span className="text-muted-foreground">Prix demandé</span>
-                  <span className="text-foreground">{formatJpy(prixAchatJpy)}</span>
+                  <Money jpy={prixAchatJpy} className="text-foreground" />
                 </li>
                 {result.priceTargets.attractivePriceJpy !== null && (
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Prix cible (attractif)</span>
-                    <span className="text-foreground">
-                      {formatJpy(result.priceTargets.attractivePriceJpy)}
-                    </span>
+                    <Money
+                      jpy={result.priceTargets.attractivePriceJpy}
+                      className="text-foreground"
+                    />
                   </li>
                 )}
                 {result.priceTargets.maxAffordablePriceJpy !== null && (
                   <li className="flex justify-between">
                     <span className="text-muted-foreground">Prix maximum conseillé</span>
-                    <span className="text-foreground">
-                      {formatJpy(result.priceTargets.maxAffordablePriceJpy)}
-                    </span>
+                    <Money
+                      jpy={result.priceTargets.maxAffordablePriceJpy}
+                      className="text-foreground"
+                    />
                   </li>
                 )}
               </ul>
@@ -323,8 +321,11 @@ export function OpportunitySection({
                   <div className="space-y-1.5">
                     {result.sensitivity.map((point) => (
                       <div key={point.prixJpy} className="flex items-center gap-3 text-sm">
-                        <span className="w-24 shrink-0 text-muted-foreground">
-                          {formatJpy(point.prixJpy)}
+                        <span className="w-32 shrink-0 leading-tight text-muted-foreground">
+                          <span className="block">{formatJpy(point.prixJpy)}</span>
+                          <span className="block text-xs">
+                            ≈ {formatEur(jpyToEur(point.prixJpy))}
+                          </span>
                         </span>
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                           <div

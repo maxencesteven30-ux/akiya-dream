@@ -214,7 +214,9 @@ export function JapanMap({ regions, regionAttributes, onSelectRegion }: JapanMap
                     : null}
                   {mode === "anciennete" && hoveredValue !== null ? `${hoveredValue}%` : null}
                   {mode === "aides" &&
-                    (hoveredValue && hoveredValue > 0 ? formatJpy(hoveredValue) : "Aucune")}
+                    (hoveredValue && hoveredValue > 0
+                      ? `${formatJpy(hoveredValue)} (${formatEur(jpyToEur(hoveredValue))})`
+                      : "Aucune")}
                   {mode === "neige" &&
                     (hoveredValue !== null ? `${hoveredValue} cm/an` : "Donnée indisponible")}
                 </p>

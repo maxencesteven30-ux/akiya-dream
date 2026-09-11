@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { deleteProject, fetchMyProjects, saveProject } from "@/lib/data";
-import { formatJpy } from "@/lib/format";
+import { deleteProject, fetchMyProjects, jpyToEur, saveProject } from "@/lib/data";
+import { formatEur, formatJpy } from "@/lib/format";
 import type { NewProjectInput, PersistedProject } from "@/lib/types";
 
 interface SavedProjectsSectionProps {
@@ -127,7 +127,8 @@ export function SavedProjectsSection({ currentProject, onLoad }: SavedProjectsSe
                 <div>
                   <p className="font-medium text-foreground">{project.name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {PROFILE_LABELS[project.profile]} · {formatJpy(project.housePriceJpy)}
+                    {PROFILE_LABELS[project.profile]} · {formatJpy(project.housePriceJpy)} (≈{" "}
+                    {formatEur(jpyToEur(project.housePriceJpy))})
                     {project.prefecture ? ` · ${project.prefecture.replace(/_/g, " ")}` : ""}
                   </p>
                 </div>

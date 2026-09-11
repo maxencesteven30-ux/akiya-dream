@@ -14,7 +14,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { computeEstimatedPriceFromSurface } from "@/lib/calculations";
-import { formatJpy } from "@/lib/format";
+import { jpyToEur } from "@/lib/data";
+import { formatEur, formatJpy } from "@/lib/format";
 import type { ListingCondition, RealListing } from "@/lib/types";
 
 const CONDITION_OPTIONS: { value: ListingCondition; label: string }[] = [
@@ -204,7 +205,9 @@ export function RealListingSection({
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-accent/30 p-3 text-sm">
             <p className="text-muted-foreground">
               Prix estimé selon la surface et l&apos;ère du bâtiment :{" "}
-              <span className="font-medium text-foreground">{formatJpy(estimatedPriceJpy)}</span>{" "}
+              <span className="font-medium text-foreground">
+                {formatJpy(estimatedPriceJpy)} (≈ {formatEur(jpyToEur(estimatedPriceJpy))})
+              </span>{" "}
               — une proposition indicative, pas une donnée mesurée pour ce bien.
             </p>
             {onApplyEstimatedPrice && (

@@ -28,6 +28,8 @@ import {
   computeRiskFlags,
 } from "@/lib/calculations";
 import type { ScenarioLabel } from "@/lib/calculations";
+import { Money } from "@/components/simulateur/money";
+import { jpyToEur } from "@/lib/data";
 import { formatEur, formatJpy } from "@/lib/format";
 import type { BuyerProfile, RealListing, Region, RenovationLevel } from "@/lib/types";
 
@@ -250,8 +252,11 @@ function ChartTooltip({
                 style={{ background: SEGMENT_COLORS[key] }}
               />
               <span className="text-muted-foreground">{SEGMENT_LABELS[key]}</span>
-              <span className="ml-auto pl-3 font-medium text-foreground">
+              <span className="ml-auto pl-3 text-right font-medium text-foreground">
                 {formatJpy(Number(entry.value ?? 0))}
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  ≈ {formatEur(jpyToEur(Number(entry.value ?? 0)))}
+                </span>
               </span>
             </li>
           );
@@ -281,9 +286,7 @@ function Legend({ budget }: { budget: ReturnType<typeof computeBudget> }) {
             style={{ background: SEGMENT_COLORS[item.key] }}
           />
           <span className="text-muted-foreground">{item.label}</span>
-          <span className="ml-auto font-medium text-foreground">
-            {formatJpy(item.value)}
-          </span>
+          <Money jpy={item.value} className="ml-auto font-medium text-foreground" />
         </li>
       ))}
     </ul>
@@ -344,7 +347,8 @@ function AnnualCostsCard({
 
       {profile === "investisseur" && (
         <Badge variant="destructive" className="mb-4">
-          Gōdō Kaisha : {formatJpy(annualCosts.comptableJpy)} de frais comptables s&apos;ajoutent
+          Gōdō Kaisha : {formatJpy(annualCosts.comptableJpy)} (≈{" "}
+          {formatEur(jpyToEur(annualCosts.comptableJpy))}) de frais comptables s&apos;ajoutent
           chaque année
         </Badge>
       )}
@@ -361,14 +365,16 @@ function AnnualCostsCard({
               {rows.map((row) => (
                 <li key={row.label} className="flex justify-between">
                   <span className="text-muted-foreground">{row.label}</span>
-                  <span className="text-foreground">
-                    {row.value > 0 ? formatJpy(row.value) : "—"}
-                  </span>
+                  {row.value > 0 ? (
+                    <Money jpy={row.value} className="text-foreground" />
+                  ) : (
+                    <span className="text-foreground">—</span>
+                  )}
                 </li>
               ))}
               <li className="flex justify-between border-t border-border pt-1.5 font-medium">
                 <span className="text-foreground">Total annuel</span>
-                <span className="text-foreground">{formatJpy(annualCosts.totalAnnuelJpy)}</span>
+                <Money jpy={annualCosts.totalAnnuelJpy} className="text-foreground" />
               </li>
             </ul>
           </AccordionContent>
@@ -415,7 +421,10 @@ function ScenarioComparison({
                   : `+${Math.round((scenario.multiplier - 1) * 100)}%`}
               </span>
             </p>
-            <p className="text-muted-foreground">Travaux : {formatJpy(scenario.travauxJpy)}</p>
+            <p className="text-muted-foreground">
+              Travaux : {formatJpy(scenario.travauxJpy)}{" "}
+              <span className="text-xs">(≈ {formatEur(jpyToEur(scenario.travauxJpy))})</span>
+            </p>
             <p className="text-foreground">
               Total : {formatJpy(scenario.totalProjetJpy)}
             </p>
@@ -470,9 +479,11 @@ function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> 
         {rows.map((row) => (
           <li key={row.label} className="flex justify-between">
             <span className="text-muted-foreground">{row.label}</span>
-            <span className="text-foreground">
-              {row.value > 0 ? formatJpy(row.value) : "—"}
-            </span>
+            {row.value > 0 ? (
+              <Money jpy={row.value} className="text-foreground" />
+            ) : (
+              <span className="text-foreground">—</span>
+            )}
           </li>
         ))}
       </ul>

@@ -3,7 +3,8 @@
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { formatJpy } from "@/lib/format";
+import { jpyToEur } from "@/lib/data";
+import { formatEur, formatJpy } from "@/lib/format";
 import type { DataConfidence, Region, RegionAttributeDetail } from "@/lib/types";
 
 interface RegionCardProps {
@@ -42,12 +43,26 @@ export function RegionCard({ region, attributeDetails }: RegionCardProps) {
       <div className="mb-5 grid gap-4 sm:grid-cols-2">
         <div>
           <p className="text-xs text-muted-foreground">Prix médian</p>
-          <p className="text-foreground">{formatJpy(region.medianPriceJpy)}</p>
+          <p className="text-foreground">
+            {formatJpy(region.medianPriceJpy)}{" "}
+            <span className="text-xs text-muted-foreground">
+              (≈ {formatEur(jpyToEur(region.medianPriceJpy))})
+            </span>
+          </p>
         </div>
         <div>
           <p className="text-xs text-muted-foreground">Subvention maximale documentée</p>
           <p className="text-foreground">
-            {region.subsidyMaxJpy > 0 ? formatJpy(region.subsidyMaxJpy) : "Aucune"}
+            {region.subsidyMaxJpy > 0 ? (
+              <>
+                {formatJpy(region.subsidyMaxJpy)}{" "}
+                <span className="text-xs text-muted-foreground">
+                  (≈ {formatEur(jpyToEur(region.subsidyMaxJpy))})
+                </span>
+              </>
+            ) : (
+              "Aucune"
+            )}
           </p>
         </div>
       </div>

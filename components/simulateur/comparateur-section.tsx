@@ -8,6 +8,7 @@ import {
   computeBudget,
   computeBudgetVerdict,
 } from "@/lib/calculations";
+import { jpyToEur } from "@/lib/data";
 import { formatEur, formatJpy } from "@/lib/format";
 import type { BudgetVerdictLevel, SavedProject } from "@/lib/types";
 
@@ -92,16 +93,31 @@ function ProjectCard({
       : null;
 
   const rows = [
-    { label: "Prix d'achat", value: formatJpy(budget.prixAchatJpy) },
-    { label: "Frais d'acquisition", value: formatJpy(budget.acquisitionFees.total) },
-    { label: "Travaux", value: formatJpy(budget.travauxJpy) },
+    {
+      label: "Prix d'achat",
+      value: `${formatJpy(budget.prixAchatJpy)} (${formatEur(jpyToEur(budget.prixAchatJpy))})`,
+    },
+    {
+      label: "Frais d'acquisition",
+      value: `${formatJpy(budget.acquisitionFees.total)} (${formatEur(jpyToEur(budget.acquisitionFees.total))})`,
+    },
+    {
+      label: "Travaux",
+      value: `${formatJpy(budget.travauxJpy)} (${formatEur(jpyToEur(budget.travauxJpy))})`,
+    },
     {
       label: "Coût initial",
       value: `${formatJpy(budget.totalProjetJpy)} (${formatEur(budget.totalProjetEur)})`,
       emphasis: true,
     },
-    { label: "Coût annuel", value: formatJpy(annual.totalAnnuelJpy) },
-    { label: "Coût à 10 ans", value: formatJpy(annual.coutDixAnsJpy) },
+    {
+      label: "Coût annuel",
+      value: `${formatJpy(annual.totalAnnuelJpy)} (${formatEur(jpyToEur(annual.totalAnnuelJpy))})`,
+    },
+    {
+      label: "Coût à 10 ans",
+      value: `${formatJpy(annual.coutDixAnsJpy)} (${formatEur(annual.coutDixAnsEur)})`,
+    },
   ];
 
   return (
