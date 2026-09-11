@@ -1,14 +1,19 @@
-import { getSupabaseClient } from "@/lib/supabase";
+import { ensureAnonymousSession, getSupabaseClient } from "@/lib/supabase";
 import type {
   AcquisitionCost,
   AnnualCost,
+  BuyerProfile,
   CostsData,
   DataConfidence,
+  NewProjectInput,
+  PersistedProject,
+  RealListing,
   RecommendationLevel,
   Region,
   RegionAttributes,
   RegionAttributeDetail,
   RenovationCost,
+  RenovationLevel,
 } from "@/lib/types";
 
 export const EUR_JPY_RATE = 179.09;
@@ -277,4 +282,109 @@ export async function fetchCosts(): Promise<CostsData> {
   ]);
 
   return { acquisition, renovation, annual };
+}
+
+interface ProjectRow {
+  id: number;
+  name: string;
+  profile: BuyerProfile;
+  house_price_jpy: number;
+  prefecture: string | null;
+  renovation_level: RenovationLevel | null;
+  capital_disponible_eur: number | null;
+  reserve_securite_eur: number | null;
+  real_listing: RealListing | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapProjectRow(row: ProjectRow): PersistedProject {
+  return {
+    id: row.id,
+    name: row.name,
+    profile: row.profile,
+    housePriceJpy: row.house_price_jpy,
+    prefecture: row.prefecture,
+    renovationLevel: row.renovation_level,
+    capitalDisponibleEur: row.capital_disponible_eur,
+    reserveSecuriteEur: row.reserve_securite_eur,
+    realListing: row.real_listing,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+// Ces trois fonctions supposent qu'une session (anonyme ou non) existe.
+// Si "Allow anonymous sign-ins" n'est pas activé côté Supabase,
+// ensureAnonymousSession() retourne null : on lève une erreur explicite
+// plutôt que d'échouer silencieusement, car sauvegarder est une action
+// volontaire de l'utilisateur (contrairement au chargement des régions).
+async function requireUserId(): Promise<string> {
+  const userId = await ensureAnonymousSession();
+  if (!userId) {
+    throw new Error(
+      "Connexion anonyme indisponible. Vérifiez que \"Allow anonymous sign-ins\" est activé dans le dashboard Supabase (Authentication > Providers).",
+    );
+  }
+  return userId;
+}
+
+export async function fetchMyProjects(): Promise<PersistedProject[]> {
+  try {
+    const userId = await ensureAnonymousSession();
+    if (!userId) return [];
+
+    const { data, error } = await getSupabaseClient()
+      .from("projects")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .returns<ProjectRow[]>();
+
+    if (error) throw error;
+    return (data ?? []).map(mapProjectRow);
+  } catch (error) {
+    console.error("fetchMyProjects failed:", error);
+    throw new Error("Impossible de charger vos projets sauvegardés depuis Supabase.");
+  }
+}
+
+export async function saveProject(input: NewProjectInput): Promise<PersistedProject> {
+  try {
+    const userId = await requireUserId();
+
+    const { data, error } = await getSupabaseClient()
+      .from("projects")
+      .insert({
+        user_id: userId,
+        name: input.name,
+        profile: input.profile,
+        house_price_jpy: input.housePriceJpy,
+        prefecture: input.prefecture,
+        renovation_level: input.renovationLevel,
+        capital_disponible_eur: input.capitalDisponibleEur,
+        reserve_securite_eur: input.reserveSecuriteEur,
+        real_listing: input.realListing,
+      })
+      .select()
+      .returns<ProjectRow[]>()
+      .single();
+
+    if (error) throw error;
+    return mapProjectRow(data);
+  } catch (error) {
+    console.error("saveProject failed:", error);
+    throw error instanceof Error
+      ? error
+      : new Error("Impossible d'enregistrer ce projet dans Supabase.");
+  }
+}
+
+export async function deleteProject(id: number): Promise<void> {
+  try {
+    const { error } = await getSupabaseClient().from("projects").delete().eq("id", id);
+    if (error) throw error;
+  } catch (error) {
+    console.error("deleteProject failed:", error);
+    throw new Error("Impossible de supprimer ce projet dans Supabase.");
+  }
 }

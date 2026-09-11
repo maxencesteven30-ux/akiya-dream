@@ -90,3 +90,20 @@ export interface RegionAttributeDetail {
   confidence: DataConfidence;
   notes: string | null;
 }
+
+export interface NewProjectInput {
+  name: string;
+  profile: BuyerProfile;
+  housePriceJpy: number;
+  prefecture: string | null;
+  renovationLevel: RenovationLevel | null;
+  capitalDisponibleEur: number | null;
+  reserveSecuriteEur: number | null;
+  realListing: RealListing | null;
+}
+
+export interface PersistedProject extends NewProjectInput {
+  id: number;
+  createdAt: string;
+  updatedAt: string;
+}
