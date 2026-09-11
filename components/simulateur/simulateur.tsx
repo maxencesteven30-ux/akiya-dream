@@ -22,6 +22,7 @@ import { OpportunitySection } from "@/components/simulateur/opportunity-section"
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
 import { ExportSection } from "@/components/simulateur/export-section";
+import { TaxProjectionSection } from "@/components/simulateur/tax-projection-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { computeBudget, computeBudgetScenarios } from "@/lib/calculations";
 import { compareProperties } from "@/lib/comparison";
@@ -386,6 +387,19 @@ export function Simulateur() {
               accompanimentLevel={state.accompanimentLevel}
               needsTranslation={state.needsTranslation}
               hiddenCosts={state.hiddenCosts}
+            />
+
+            <Separator />
+            <TaxProjectionSection
+              housePriceJpy={state.housePriceJpy}
+              profile={state.profile}
+              renovationLevel={state.renovationLevel}
+              realListing={state.realListing}
+              accompanimentLevel={state.accompanimentLevel}
+              needsTranslation={state.needsTranslation}
+              hiddenCosts={state.hiddenCosts}
+              snowyRegion={state.snowyRegion}
+              includeNeighborhoodAssociation={state.includeNeighborhoodAssociation}
             />
 
             <Separator />

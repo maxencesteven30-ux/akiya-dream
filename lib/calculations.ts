@@ -345,8 +345,14 @@ export function computeBudgetScenarios(
 }
 
 const TAXABLE_VALUE_RATIO = 0.5;
-const PROPERTY_TAX_RATE = 0.014;
-const CITY_PLANNING_TAX_RATE = 0.003;
+// Taux nationaux standards japonais (loi sur les impôts locaux) : 1,4% de
+// taxe foncière + plafond légal de 0,3% de taxe d'urbanisme. Ce ne sont PAS
+// des taux par préfecture — certaines municipalités peuvent légalement les
+// ajuster, mais sans recherche vérifiée municipalité par municipalité, le
+// taux national standard s'applique uniformément (exporté pour lib/taxes.ts,
+// afin de ne pas redéclarer la même donnée ailleurs).
+export const PROPERTY_TAX_RATE = 0.014;
+export const CITY_PLANNING_TAX_RATE = 0.003;
 const INSURANCE_JPY = 50_000;
 const MANAGEMENT_MAINTENANCE_JPY = 100_000;
 const GK_ACCOUNTING_JPY = 250_000;
