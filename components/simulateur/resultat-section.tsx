@@ -25,6 +25,7 @@ import {
   calculateAnnualCosts,
   computeBudget,
   computeBudgetScenarios,
+  computeRiskFlags,
 } from "@/lib/calculations";
 import type { ScenarioLabel } from "@/lib/calculations";
 import { formatEur, formatJpy } from "@/lib/format";
@@ -77,6 +78,11 @@ export function ResultatSection({
     if (!profile || !renovationLevel) return null;
     return computeBudgetScenarios(housePriceJpy, profile, renovationLevel);
   }, [housePriceJpy, profile, renovationLevel]);
+
+  const riskFlags = useMemo(() => {
+    if (!profile || !renovationLevel) return [];
+    return computeRiskFlags(profile, renovationLevel, region);
+  }, [profile, renovationLevel, region]);
 
   return (
     <motion.section
@@ -153,6 +159,12 @@ export function ResultatSection({
           </div>
         )}
       </Card>
+
+      {ready && riskFlags.length > 0 && (
+        <div className="mt-6">
+          <RiskCheckerCard riskFlags={riskFlags} />
+        </div>
+      )}
 
       {ready && annualCosts && profile && (
         <div className="mt-6">
@@ -233,6 +245,28 @@ function Legend({ budget }: { budget: ReturnType<typeof computeBudget> }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function RiskCheckerCard({ riskFlags }: { riskFlags: ReturnType<typeof computeRiskFlags> }) {
+  return (
+    <Card className="border-border p-6 sm:p-8">
+      <p className="mb-1 text-xs uppercase tracking-wide text-muted-foreground">
+        Points de vigilance
+      </p>
+      <p className="mb-4 text-xs text-muted-foreground">
+        Signaux automatiques basés sur vos choix — ne remplacent pas un
+        diagnostic professionnel.
+      </p>
+      <ul className="space-y-3 text-sm">
+        {riskFlags.map((flag) => (
+          <li key={flag.key} className="flex gap-2">
+            <span aria-hidden="true">⚠️</span>
+            <span className="text-foreground">{flag.message}</span>
+          </li>
+        ))}
+      </ul>
+    </Card>
   );
 }
 

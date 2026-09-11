@@ -9,8 +9,28 @@ import {
   computeLegalSetupFee,
   computeRenovationBudget,
   computeRenovationScenarios,
+  computeRiskFlags,
   EUR_JPY_RATE,
 } from "@/lib/calculations";
+import type { Region } from "@/lib/types";
+
+const SAMPLE_REGION_LOW_RISK: Region = {
+  prefecture: "Fukuoka_Periph",
+  medianPriceJpy: 4_800_000,
+  medianAgeYears: 35,
+  pre1981Percent: 30,
+  subsidyMaxJpy: 0,
+  recommendationLevel: "B",
+};
+
+const SAMPLE_REGION_HIGH_RISK: Region = {
+  prefecture: "Shimane",
+  medianPriceJpy: 3_000_000,
+  medianAgeYears: 50,
+  pre1981Percent: 61,
+  subsidyMaxJpy: 0,
+  recommendationLevel: "C",
+};
 
 describe("computeAgencyFee", () => {
   it("applique le forfait plafonné en dessous du seuil de 8M JPY", () => {
@@ -156,5 +176,38 @@ describe("computeBudgetScenarios", () => {
     expect(optimiste.totalProjetJpy).toBeCloseTo(11_615_000, 6);
     expect(realiste.totalProjetJpy).toBeCloseTo(12_415_000, 6); // +800 000
     expect(prudent.totalProjetJpy).toBeCloseTo(13_215_000, 6); // +1 600 000
+  });
+});
+
+describe("computeRiskFlags", () => {
+  it("ne retourne aucun point de vigilance sans région (pas de données)", () => {
+    expect(computeRiskFlags("solo", "leger", null)).toEqual([]);
+  });
+
+  it("signale la clarification juridique uniquement pour le profil à deux", () => {
+    const solo = computeRiskFlags("solo", "leger", null);
+    const duo = computeRiskFlags("duo", "leger", null);
+    expect(solo.some((f) => f.key === "duo-ownership")).toBe(false);
+    expect(duo.some((f) => f.key === "duo-ownership")).toBe(true);
+  });
+
+  it("signale la marge d'imprévus uniquement pour les travaux lourds", () => {
+    const standard = computeRiskFlags("solo", "standard", null);
+    const lourd = computeRiskFlags("solo", "lourd", null);
+    expect(standard.some((f) => f.key === "heavy-renovation")).toBe(false);
+    expect(lourd.some((f) => f.key === "heavy-renovation")).toBe(true);
+  });
+
+  it("signale le bâti ancien seulement au dessus du seuil de 40%", () => {
+    const lowRisk = computeRiskFlags("solo", "leger", SAMPLE_REGION_LOW_RISK);
+    const highRisk = computeRiskFlags("solo", "leger", SAMPLE_REGION_HIGH_RISK);
+    expect(lowRisk.some((f) => f.key === "old-construction")).toBe(false);
+    expect(highRisk.some((f) => f.key === "old-construction")).toBe(true);
+    expect(highRisk.find((f) => f.key === "old-construction")?.message).toContain("61%");
+  });
+
+  it("signale l'accès aux services dès qu'une région est sélectionnée", () => {
+    const flags = computeRiskFlags("solo", "leger", SAMPLE_REGION_LOW_RISK);
+    expect(flags.some((f) => f.key === "rural-access")).toBe(true);
   });
 });

@@ -1,5 +1,10 @@
 import { EUR_JPY_RATE, jpyToEur } from "@/lib/data";
-import type { BudgetVerdictLevel, BuyerProfile, RenovationLevel } from "@/lib/types";
+import type {
+  BudgetVerdictLevel,
+  BuyerProfile,
+  Region,
+  RenovationLevel,
+} from "@/lib/types";
 
 const AGENCY_FLAT_FEE_JPY = 330_000;
 const AGENCY_FLAT_THRESHOLD_JPY = 8_000_000;
@@ -245,6 +250,67 @@ export function computeBudgetVerdict(
     margeEur,
     verdict,
   };
+}
+
+// Seuil déterministe : part du parc antérieur à 1981 (norme antisismique
+// japonaise pré-Shin-Taishin) à partir de laquelle on recommande une
+// vérification technique. Donnée régionale réelle (Supabase), seuil
+// explicite posé ici, pas une donnée mesurée elle-même.
+const OLD_CONSTRUCTION_THRESHOLD_PERCENT = 40;
+
+export interface RiskFlag {
+  key: string;
+  message: string;
+}
+
+const RISK_DISCLAIMER_SUFFIX = "à vérifier avec un professionnel";
+
+export function computeRiskFlags(
+  profile: BuyerProfile,
+  renovationLevel: RenovationLevel,
+  region: Region | null,
+): RiskFlag[] {
+  const flags: RiskFlag[] = [];
+
+  if (profile === "duo") {
+    flags.push({
+      key: "duo-ownership",
+      message:
+        `Point de vigilance — à deux, clarifiez juridiquement la propriété et ` +
+        `la répartition avant l'achat (${RISK_DISCLAIMER_SUFFIX})`,
+    });
+  }
+
+  if (renovationLevel === "lourd") {
+    flags.push({
+      key: "heavy-renovation",
+      message:
+        "Point de vigilance — rénovation lourde : prévoyez une marge " +
+        "d'imprévus (voir le scénario prudent ci-dessus).",
+    });
+  }
+
+  if (region && region.pre1981Percent >= OLD_CONSTRUCTION_THRESHOLD_PERCENT) {
+    const name = region.prefecture.replace(/_/g, " ");
+    flags.push({
+      key: "old-construction",
+      message:
+        `Point de vigilance — ${region.pre1981Percent}% du parc de ${name} est ` +
+        `antérieur à 1981 : une vérification technique (séisme, amiante) est ` +
+        `recommandée (${RISK_DISCLAIMER_SUFFIX})`,
+    });
+  }
+
+  if (region) {
+    flags.push({
+      key: "rural-access",
+      message:
+        "Point de vigilance — vérifiez l'accès aux services (gare, commerces, " +
+        "santé) et les transports avant de vous engager.",
+    });
+  }
+
+  return flags;
 }
 
 export { EUR_JPY_RATE };
