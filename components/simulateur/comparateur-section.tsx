@@ -1,29 +1,20 @@
 "use client";
 
+import { useMemo } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import {
-  calculateAnnualCosts,
-  computeBudget,
-  computeBudgetVerdict,
-} from "@/lib/calculations";
-import { jpyToEur } from "@/lib/data";
-import { formatEur, formatJpy } from "@/lib/format";
-import type { BudgetVerdictLevel, SavedProject } from "@/lib/types";
+import { Money } from "@/components/simulateur/money";
+import { compareProperties, getBestDeal } from "@/lib/comparison";
+import type { Region, SavedProject } from "@/lib/types";
 
 interface ComparateurSectionProps {
   projects: SavedProject[];
   onRemove: (id: string) => void;
   capitalDisponibleEur: number | null;
   reserveSecuriteEur: number | null;
+  regions: Region[];
 }
-
-const VERDICT_EMOJI: Record<BudgetVerdictLevel, string> = {
-  viable: "🟢",
-  tendu: "🟠",
-  non_viable: "🔴",
-};
 
 const PROFILE_LABELS = {
   solo: "Solo",
@@ -42,8 +33,24 @@ export function ComparateurSection({
   onRemove,
   capitalDisponibleEur,
   reserveSecuriteEur,
+  regions,
 }: ComparateurSectionProps) {
+  const comparisons = useMemo(() => {
+    return compareProperties(
+      projects.map((property) => ({
+        property,
+        region: regions.find((r) => r.prefecture === property.prefecture) ?? null,
+        capitalDisponibleEur,
+        reserveSecuriteEur,
+      })),
+    );
+  }, [projects, regions, capitalDisponibleEur, reserveSecuriteEur]);
+
+  const bestDeal = useMemo(() => getBestDeal(comparisons), [comparisons]);
+
   if (projects.length === 0) return null;
+
+  const projectById = new Map(projects.map((p) => [p.id, p]));
 
   return (
     <motion.section
@@ -52,116 +59,87 @@ export function ComparateurSection({
       transition={{ duration: 0.4 }}
     >
       <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
-        Étape 5 — Comparer
+        🔍 Comparateur
       </h2>
       <p className="mb-5 text-lg text-foreground">
-        {projects.length} projet{projects.length > 1 ? "s" : ""} enregistré
-        {projects.length > 1 ? "s" : ""} pour comparaison
+        {projects.length} bien{projects.length > 1 ? "s" : ""} comparé{projects.length > 1 ? "s" : ""}{" "}
+        (maximum 3)
       </p>
 
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {projects.map((project) => (
-          <ProjectCard
-            key={project.id}
-            project={project}
-            onRemove={onRemove}
-            capitalDisponibleEur={capitalDisponibleEur}
-            reserveSecuriteEur={reserveSecuriteEur}
-          />
-        ))}
-      </div>
+      <Card className="overflow-x-auto border-border p-0">
+        <table className="w-full min-w-[640px] text-sm">
+          <thead>
+            <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Nom</th>
+              <th className="px-4 py-3 font-medium">Prix</th>
+              <th className="px-4 py-3 font-medium">Total</th>
+              <th className="px-4 py-3 font-medium">Note /10</th>
+              <th className="px-4 py-3 font-medium">Verdict</th>
+              <th className="px-4 py-3 font-medium">Durée</th>
+              <th className="px-4 py-3 font-medium" aria-label="Actions" />
+            </tr>
+          </thead>
+          <tbody>
+            {comparisons.map((comparison) => {
+              const project = projectById.get(comparison.propertyId);
+              const isBest = bestDeal?.propertyId === comparison.propertyId;
+              return (
+                <tr
+                  key={comparison.propertyId}
+                  className={`border-b border-border last:border-b-0 ${
+                    isBest ? "bg-emerald-600/5" : ""
+                  }`}
+                >
+                  <td className="px-4 py-3 font-medium text-foreground">
+                    {isBest && <span aria-hidden="true">🏆 </span>}
+                    {comparison.name}
+                    {project && (
+                      <p className="text-xs font-normal text-muted-foreground">
+                        {PROFILE_LABELS[project.profile]} ·{" "}
+                        {RENOVATION_LABELS[project.renovationLevel]}
+                      </p>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    {project && <Money jpy={project.housePriceJpy} className="text-foreground" />}
+                  </td>
+                  <td className="px-4 py-3">
+                    <Money jpy={comparison.totalBudgetJpy} className="text-foreground" />
+                  </td>
+                  <td className="px-4 py-3 text-foreground">
+                    {comparison.opportunityScore !== null
+                      ? comparison.opportunityScore.toFixed(1)
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-3 text-foreground">
+                    {comparison.feasibilityVerdict ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 text-foreground">
+                    ~{comparison.renovationDurationMonths} mois
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="text-muted-foreground"
+                      onClick={() => onRemove(comparison.propertyId)}
+                      aria-label={`Retirer ${comparison.name} du comparateur`}
+                    >
+                      ×
+                    </Button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </Card>
+
+      <p className="mt-3 text-xs text-muted-foreground">
+        Note /10 et verdict non disponibles (—) si le bien n&apos;a pas de région/état renseignés,
+        ou si le budget disponible n&apos;a pas été saisi à l&apos;étape 4. Durée de chantier : une
+        estimation indicative par niveau de travaux, pas une donnée mesurée.
+      </p>
     </motion.section>
-  );
-}
-
-function ProjectCard({
-  project,
-  onRemove,
-  capitalDisponibleEur,
-  reserveSecuriteEur,
-}: {
-  project: SavedProject;
-  onRemove: (id: string) => void;
-  capitalDisponibleEur: number | null;
-  reserveSecuriteEur: number | null;
-}) {
-  const budget = computeBudget(project.housePriceJpy, project.profile, project.renovationLevel);
-  const annual = calculateAnnualCosts(project.housePriceJpy, project.profile);
-  const verdict =
-    capitalDisponibleEur !== null && reserveSecuriteEur !== null
-      ? computeBudgetVerdict(budget.totalProjetEur, capitalDisponibleEur, reserveSecuriteEur)
-      : null;
-
-  const rows = [
-    {
-      label: "Prix d'achat",
-      value: `${formatJpy(budget.prixAchatJpy)} (${formatEur(jpyToEur(budget.prixAchatJpy))})`,
-    },
-    {
-      label: "Frais d'acquisition",
-      value: `${formatJpy(budget.acquisitionFees.total)} (${formatEur(jpyToEur(budget.acquisitionFees.total))})`,
-    },
-    {
-      label: "Travaux",
-      value: `${formatJpy(budget.travauxJpy)} (${formatEur(jpyToEur(budget.travauxJpy))})`,
-    },
-    {
-      label: "Coût initial",
-      value: `${formatJpy(budget.totalProjetJpy)} (${formatEur(budget.totalProjetEur)})`,
-      emphasis: true,
-    },
-    {
-      label: "Coût annuel",
-      value: `${formatJpy(annual.totalAnnuelJpy)} (${formatEur(jpyToEur(annual.totalAnnuelJpy))})`,
-    },
-    {
-      label: "Coût à 10 ans",
-      value: `${formatJpy(annual.coutDixAnsJpy)} (${formatEur(annual.coutDixAnsEur)})`,
-    },
-  ];
-
-  return (
-    <Card className="w-64 shrink-0 border-border p-5 sm:w-72">
-      <div className="mb-4 flex items-start justify-between gap-2">
-        <div>
-          <p className="font-medium text-foreground">{project.name}</p>
-          <p className="text-xs text-muted-foreground">
-            {PROFILE_LABELS[project.profile]} · {RENOVATION_LABELS[project.renovationLevel]}
-          </p>
-        </div>
-        <Button
-          variant="ghost"
-          size="icon-xs"
-          className="shrink-0 text-muted-foreground"
-          onClick={() => onRemove(project.id)}
-          aria-label={`Retirer ${project.name} du comparateur`}
-        >
-          ×
-        </Button>
-      </div>
-
-      <ul className="space-y-1.5 text-sm">
-        {rows.map((row) => (
-          <li key={row.label} className="flex flex-col">
-            <span className="text-xs text-muted-foreground">{row.label}</span>
-            <span className={row.emphasis ? "font-medium text-foreground" : "text-foreground"}>
-              {row.value}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      {verdict && (
-        <div className="mt-4 border-t border-border pt-3 text-sm">
-          <p className="mb-1 flex items-center gap-1.5">
-            <span>{VERDICT_EMOJI[verdict.verdict]}</span>
-            <span className="text-foreground">
-              {verdict.margeEur >= 0 ? "Marge" : "Manque"} :{" "}
-              {formatEur(Math.abs(verdict.margeEur))}
-            </span>
-          </p>
-        </div>
-      )}
-    </Card>
   );
 }

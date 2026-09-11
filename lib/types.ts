@@ -96,6 +96,10 @@ export interface SavedProject {
   profile: BuyerProfile;
   housePriceJpy: number;
   renovationLevel: RenovationLevel;
+  // Optionnels : connus seulement si renseignés au moment de l'ajout au
+  // comparateur (jamais déduits ou inventés après coup).
+  prefecture: string | null;
+  realListing: RealListing | null;
 }
 
 export interface RegionAttributes {

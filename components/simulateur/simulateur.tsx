@@ -36,7 +36,8 @@ import type {
   SimulatorState,
 } from "@/lib/types";
 
-const MAX_SAVED_PROJECTS = 4;
+const MAX_SAVED_PROJECTS = 3;
+const COMPARISONS_STORAGE_KEY = "akiya-comparisons";
 
 const DEFAULT_STATE: SimulatorState = {
   profile: null,
@@ -57,11 +58,33 @@ export function Simulateur() {
   const [regionAttributeDetails, setRegionAttributeDetails] = useState<
     Record<string, RegionAttributeDetail[]>
   >({});
-  const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
+  // Comparateur : persistance locale (pas de compte requis, contrairement à
+  // "Mes projets sauvegardés" qui utilise Supabase). Lecture via
+  // l'initialiseur paresseux de useState (jamais dans un effet) : exécuté
+  // une seule fois, côté client uniquement — côté serveur, `window` est
+  // absent et on retombe simplement sur un tableau vide.
+  const [savedProjects, setSavedProjects] = useState<SavedProject[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = window.localStorage.getItem(COMPARISONS_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as SavedProject[]) : [];
+    } catch (err) {
+      console.error("Lecture du comparateur depuis localStorage impossible:", err);
+      return [];
+    }
+  });
   const [subsidiesJpy, setSubsidiesJpy] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(COMPARISONS_STORAGE_KEY, JSON.stringify(savedProjects));
+    } catch (err) {
+      console.error("Écriture du comparateur dans localStorage impossible:", err);
+    }
+  }, [savedProjects]);
 
   useEffect(() => {
     let ignore = false;
@@ -166,6 +189,8 @@ export function Simulateur() {
         profile: state.profile!,
         housePriceJpy: state.housePriceJpy,
         renovationLevel: state.renovationLevel!,
+        prefecture: state.prefecture,
+        realListing: state.realListing,
       },
     ]);
   };
@@ -329,6 +354,7 @@ export function Simulateur() {
               onRemove={removeFromComparateur}
               capitalDisponibleEur={state.capitalDisponibleEur}
               reserveSecuriteEur={state.reserveSecuriteEur}
+              regions={regions}
             />
 
             <Separator />
