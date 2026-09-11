@@ -66,3 +66,17 @@ export interface RegionAttributes {
   forestAreaPercent: number | null;
   avgAnnualSnowfallCm: number | null;
 }
+
+export type DataConfidence = "verified" | "estimated" | "unknown";
+
+export interface RegionAttributeDetail {
+  key: string;
+  label: string;
+  value: number | null;
+  unit: string;
+  sourceName: string;
+  sourceUrl: string | null;
+  verifiedAt: string;
+  confidence: DataConfidence;
+  notes: string | null;
+}

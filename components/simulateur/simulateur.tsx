@@ -16,9 +16,10 @@ import { BudgetSection } from "@/components/simulateur/budget-section";
 import { ComparateurSection } from "@/components/simulateur/comparateur-section";
 import { RegionFinder } from "@/components/simulateur/region-finder";
 import { Roadmap } from "@/components/roadmap/roadmap";
-import { fetchRegionAttributes, fetchRegions } from "@/lib/data";
+import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import type {
   BuyerProfile,
+  RegionAttributeDetail,
   RegionAttributes,
   RenovationLevel,
   Region,
@@ -41,6 +42,9 @@ export function Simulateur() {
   const [state, setState] = useState<SimulatorState>(DEFAULT_STATE);
   const [regions, setRegions] = useState<Region[]>([]);
   const [regionAttributes, setRegionAttributes] = useState<Record<string, RegionAttributes>>({});
+  const [regionAttributeDetails, setRegionAttributeDetails] = useState<
+    Record<string, RegionAttributeDetail[]>
+  >({});
   const [savedProjects, setSavedProjects] = useState<SavedProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +67,16 @@ export function Simulateur() {
             // fonctionnalité critique : son échec ne doit pas bloquer le
             // reste du simulateur.
             console.error("fetchRegionAttributes failed:", err);
+          });
+
+        fetchRegionAttributeDetails()
+          .then((details) => {
+            if (!ignore) setRegionAttributeDetails(details);
+          })
+          .catch((err: unknown) => {
+            // Idem : les fiches régionales sont une amélioration, pas
+            // une fonctionnalité critique.
+            console.error("fetchRegionAttributeDetails failed:", err);
           });
       })
       .catch((err: unknown) => {
@@ -173,6 +187,7 @@ export function Simulateur() {
             />
             <ProjetSection
               regions={regions}
+              regionAttributeDetails={regionAttributeDetails}
               housePriceJpy={state.housePriceJpy}
               onHousePriceChange={setHousePriceJpy}
               prefecture={state.prefecture}

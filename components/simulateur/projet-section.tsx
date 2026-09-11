@@ -1,6 +1,8 @@
 "use client";
 
+import { useState } from "react";
 import { motion } from "framer-motion";
+import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import {
   Select,
@@ -11,8 +13,9 @@ import {
 } from "@/components/ui/select";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
+import { RegionCard } from "@/components/simulateur/region-card";
 import { formatJpy } from "@/lib/format";
-import type { Region, RenovationLevel } from "@/lib/types";
+import type { Region, RegionAttributeDetail, RenovationLevel } from "@/lib/types";
 
 export const HOUSE_PRICE_MIN_JPY = 500_000;
 export const HOUSE_PRICE_MAX_JPY = 10_000_000;
@@ -25,6 +28,7 @@ const RENOVATION_OPTIONS: { value: RenovationLevel; title: string; hint: string 
 
 interface ProjetSectionProps {
   regions: Region[];
+  regionAttributeDetails: Record<string, RegionAttributeDetail[]>;
   housePriceJpy: number;
   onHousePriceChange: (value: number) => void;
   prefecture: string | null;
@@ -35,6 +39,7 @@ interface ProjetSectionProps {
 
 export function ProjetSection({
   regions,
+  regionAttributeDetails,
   housePriceJpy,
   onHousePriceChange,
   prefecture,
@@ -42,6 +47,9 @@ export function ProjetSection({
   renovationLevel,
   onRenovationLevelChange,
 }: ProjetSectionProps) {
+  const [showFiche, setShowFiche] = useState(false);
+  const selectedRegion = regions.find((r) => r.prefecture === prefecture) ?? null;
+
   return (
     <motion.section
       initial={{ opacity: 0, y: 16 }}
@@ -93,6 +101,23 @@ export function ProjetSection({
             ))}
           </SelectContent>
         </Select>
+
+        {selectedRegion && (
+          <div className="mt-3">
+            <Button variant="ghost" size="sm" onClick={() => setShowFiche((v) => !v)}>
+              {showFiche ? "Masquer la fiche" : "Voir la fiche de cette région"}
+            </Button>
+          </div>
+        )}
+
+        {selectedRegion && showFiche && (
+          <div className="mt-3">
+            <RegionCard
+              region={selectedRegion}
+              attributeDetails={regionAttributeDetails[selectedRegion.prefecture]}
+            />
+          </div>
+        )}
       </div>
 
       <div>

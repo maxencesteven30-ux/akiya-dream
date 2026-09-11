@@ -3,9 +3,11 @@ import type {
   AcquisitionCost,
   AnnualCost,
   CostsData,
+  DataConfidence,
   RecommendationLevel,
   Region,
   RegionAttributes,
+  RegionAttributeDetail,
   RenovationCost,
 } from "@/lib/types";
 
@@ -203,6 +205,67 @@ export async function fetchRegionAttributes(): Promise<Record<string, RegionAttr
   } catch (error) {
     console.error("fetchRegionAttributes failed:", error);
     throw new Error("Impossible de charger les attributs régionaux depuis Supabase.");
+  }
+}
+
+interface RegionAttributeDetailRow {
+  attribute_key: string;
+  value_numeric: number | null;
+  source_name: string;
+  source_url: string | null;
+  verified_at: string;
+  confidence: DataConfidence;
+  notes: string | null;
+  regions: { name: string } | null;
+}
+
+const ATTRIBUTE_DISPLAY: Record<string, { label: string; unit: string }> = {
+  has_coastline: { label: "Façade maritime", unit: "" },
+  shinkansen_station_count: { label: "Gares Shinkansen", unit: "" },
+  forest_area_percent: { label: "Couverture forestière", unit: "%" },
+  avg_annual_snowfall_cm: { label: "Neige moyenne / an", unit: "cm" },
+};
+
+export async function fetchRegionAttributeDetails(): Promise<
+  Record<string, RegionAttributeDetail[]>
+> {
+  try {
+    const { data, error } = await getSupabaseClient()
+      .from("region_attributes")
+      .select("attribute_key, value_numeric, source_name, source_url, verified_at, confidence, notes, regions(name)")
+      .returns<RegionAttributeDetailRow[]>();
+
+    if (error) throw error;
+
+    const byRegion: Record<string, RegionAttributeDetail[]> = {};
+
+    for (const row of data ?? []) {
+      const name = row.regions?.name;
+      if (!name) continue;
+      if (!byRegion[name]) byRegion[name] = [];
+
+      const display = ATTRIBUTE_DISPLAY[row.attribute_key] ?? {
+        label: row.attribute_key,
+        unit: "",
+      };
+
+      byRegion[name].push({
+        key: row.attribute_key,
+        label: display.label,
+        value: row.value_numeric,
+        unit: display.unit,
+        sourceName: row.source_name,
+        sourceUrl: row.source_url,
+        verifiedAt: row.verified_at,
+        confidence: row.confidence,
+        notes: row.notes,
+      });
+    }
+
+    return byRegion;
+  } catch (error) {
+    console.error("fetchRegionAttributeDetails failed:", error);
+    throw new Error("Impossible de charger le détail des attributs régionaux depuis Supabase.");
   }
 }
 
