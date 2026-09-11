@@ -14,6 +14,9 @@ import { Label } from "@/components/ui/label";
 import { formatJpy } from "@/lib/format";
 import type { Region, RenovationLevel } from "@/lib/types";
 
+export const HOUSE_PRICE_MIN_JPY = 500_000;
+export const HOUSE_PRICE_MAX_JPY = 10_000_000;
+
 const RENOVATION_OPTIONS: { value: RenovationLevel; title: string; hint: string }[] = [
   { value: "leger", title: "Léger", hint: "~3 M JPY — rafraîchissement" },
   { value: "standard", title: "Standard", hint: "~8 M JPY — rénovation complète" },
@@ -61,15 +64,15 @@ export function ProjetSection({
           </span>
         </div>
         <Slider
-          min={500000}
-          max={10000000}
+          min={HOUSE_PRICE_MIN_JPY}
+          max={HOUSE_PRICE_MAX_JPY}
           step={100000}
           value={[housePriceJpy]}
           onValueChange={(v) => onHousePriceChange(Array.isArray(v) ? v[0] : v)}
         />
         <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-          <span>500 000 JPY</span>
-          <span>10 000 000 JPY</span>
+          <span>{formatJpy(HOUSE_PRICE_MIN_JPY)}</span>
+          <span>{formatJpy(HOUSE_PRICE_MAX_JPY)}</span>
         </div>
       </div>
 

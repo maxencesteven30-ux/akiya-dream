@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfilSection } from "@/components/simulateur/profil-section";
-import { ProjetSection } from "@/components/simulateur/projet-section";
+import {
+  HOUSE_PRICE_MAX_JPY,
+  HOUSE_PRICE_MIN_JPY,
+  ProjetSection,
+} from "@/components/simulateur/projet-section";
 import { ResultatSection } from "@/components/simulateur/resultat-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
 import { fetchRegions } from "@/lib/data";
@@ -68,7 +72,16 @@ export function Simulateur() {
   const setHousePriceJpy = (housePriceJpy: number) =>
     setState((prev) => ({ ...prev, housePriceJpy }));
   const setPrefecture = (prefecture: string) =>
-    setState((prev) => ({ ...prev, prefecture }));
+    setState((prev) => {
+      const region = regions.find((r) => r.prefecture === prefecture);
+      const housePriceJpy = region
+        ? Math.min(
+            HOUSE_PRICE_MAX_JPY,
+            Math.max(HOUSE_PRICE_MIN_JPY, region.medianPriceJpy),
+          )
+        : prev.housePriceJpy;
+      return { ...prev, prefecture, housePriceJpy };
+    });
   const setRenovationLevel = (renovationLevel: RenovationLevel) =>
     setState((prev) => ({ ...prev, renovationLevel }));
 
@@ -117,7 +130,7 @@ export function Simulateur() {
             <Separator />
             <ResultatSection
               housePriceJpy={state.housePriceJpy}
-              prefecture={state.prefecture}
+              region={regions.find((r) => r.prefecture === state.prefecture) ?? null}
               profile={state.profile}
               renovationLevel={state.renovationLevel}
             />

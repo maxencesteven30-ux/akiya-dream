@@ -23,11 +23,11 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { calculateAnnualCosts, computeBudget } from "@/lib/calculations";
 import { formatEur, formatJpy } from "@/lib/format";
-import type { BuyerProfile, RenovationLevel } from "@/lib/types";
+import type { BuyerProfile, Region, RenovationLevel } from "@/lib/types";
 
 interface ResultatSectionProps {
   housePriceJpy: number;
-  prefecture: string | null;
+  region: Region | null;
   profile: BuyerProfile | null;
   renovationLevel: RenovationLevel | null;
 }
@@ -40,11 +40,11 @@ const SEGMENT_COLORS = {
 
 export function ResultatSection({
   housePriceJpy,
-  prefecture,
+  region,
   profile,
   renovationLevel,
 }: ResultatSectionProps) {
-  const ready = Boolean(profile && prefecture && renovationLevel);
+  const ready = Boolean(profile && region && renovationLevel);
 
   const budget = useMemo(() => {
     if (!profile || !renovationLevel) return null;
@@ -77,7 +77,14 @@ export function ResultatSection({
       <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">
         Étape 3 — Le choc de réalité
       </h2>
-      <p className="mb-5 text-lg text-foreground">Du prix affiché au coût réel</p>
+      <div className="mb-5 flex items-center gap-2">
+        <p className="text-lg text-foreground">Du prix affiché au coût réel</p>
+        {region && (
+          <Badge variant="secondary" className="font-normal">
+            {region.prefecture.replace(/_/g, " ")} — niveau {region.recommendationLevel}
+          </Badge>
+        )}
+      </div>
 
       <Card className="border-border p-6 sm:p-8">
         {!ready || !budget ? (
