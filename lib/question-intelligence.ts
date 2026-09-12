@@ -25,6 +25,7 @@ import {
 } from "@/lib/exit-strategy";
 import { computeHistoryDiffs, findVisitComparison } from "@/lib/history";
 import { CHECKLIST_TEMPLATE } from "@/lib/due-diligence";
+import type { RiskFlag } from "@/lib/calculations";
 import type {
   ExitStrategyProfile,
   HistoryEntry,
@@ -190,6 +191,7 @@ export interface ProjectSnapshot {
   remoteOwner: RemoteOwnerProfile;
   exitStrategy: ExitStrategyProfile;
   history: HistoryEntry[];
+  riskFlags: RiskFlag[];
 }
 
 function insufficientDataAnswer(def: QuestionDef): QuestionAnswer {
@@ -563,6 +565,31 @@ const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer
       unknowns: [],
       reason: { ruleId: "Q08_max_price", message: "Le plafond n'est pas une valeur de marché", fieldsUsed: ["budget.maxAffordablePriceJpy"] },
       nextBestAction: null,
+    };
+  },
+
+  // Q44 — "Qu'est-ce qui pourrait faire exploser le budget ?" : risques
+  // documentés (moteur existant) + inconnues critiques à impact potentiel
+  // sur le coût — jamais un montant inventé sans source/devis.
+  Q44: (snap) => {
+    const signals = buildNextActionSignals(snap.nextActionInput).filter(
+      (s) => s.level === "BLOCKING" || s.level === "CRITICAL_UNKNOWN",
+    );
+    const documentedRisks = snap.riskFlags.map((f) => f.message);
+    const unknowns = [...documentedRisks, ...signals.map((s) => s.reason.message)];
+    return {
+      questionId: "Q44",
+      status: "ANSWERED",
+      verdict: signals.some((s) => s.level === "BLOCKING") ? "RED" : unknowns.length > 0 ? "ORANGE" : "GREEN",
+      answer:
+        unknowns.length > 0
+          ? `${unknowns.length} facteur(s) à impact potentiellement élevé identifiés — aucun montant n'est inventé sans devis ou source.`
+          : "Aucun risque documenté ni inconnue critique identifié pour l'instant.",
+      knownFacts: [],
+      estimates: [],
+      unknowns,
+      reason: { ruleId: "Q44_budget_shock", message: "Inconnue critique ≠ coût certain", fieldsUsed: ["riskFlags", "nextActionInput"] },
+      nextBestAction: signals[0]?.message ?? null,
     };
   },
 

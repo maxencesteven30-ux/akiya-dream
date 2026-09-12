@@ -43,6 +43,7 @@ const readySnapshot: ProjectSnapshot = {
   remoteOwner: createEmptyRemoteOwnerProfile(),
   exitStrategy: createEmptyExitStrategyProfile(),
   history: [],
+  riskFlags: [],
 };
 
 describe("QUESTION_REGISTRY", () => {
@@ -86,7 +87,7 @@ describe("computeQuestionAnswer — clusters génériques", () => {
   });
 
   it("retourne null pour une question cluster A/B non encore câblée (pas de réponse inventée)", () => {
-    const answer = computeQuestionAnswer("Q44", readySnapshot);
+    const answer = computeQuestionAnswer("Q47", readySnapshot);
     expect(answer).toBeNull();
   });
 
@@ -421,6 +422,23 @@ describe("computeQuestionAnswer — Q08 (plafond financier)", () => {
   });
 });
 
+describe("computeQuestionAnswer — Q44 (facteurs de risque budgetaire)", () => {
+  it("combine risques documentes et inconnues critiques sans inventer de montant", () => {
+    const answer = computeQuestionAnswer("Q44", {
+      ...readySnapshot,
+      riskFlags: [{ key: "acces_isole", message: "Accès isolé : coûts de déneigement/entretien potentiellement plus élevés." }],
+      nextActionInput: { ...readyNextActionInput, landNature: null },
+    });
+    expect(answer?.unknowns.length).toBe(2);
+    expect(answer?.unknowns[0]).toMatch(/déneigement/i);
+  });
+
+  it("repond qu'aucun risque n'est identifie quand tout est vert", () => {
+    const answer = computeQuestionAnswer("Q44", readySnapshot);
+    expect(answer?.verdict).toBe("GREEN");
+  });
+});
+
 describe("listAnswerableQuestions", () => {
   it("n'inclut que les questions C/D/E ou dotées d'un handler A/B réel", () => {
     const answerable = listAnswerableQuestions();
@@ -430,8 +448,8 @@ describe("listAnswerableQuestions", () => {
     }
   });
 
-  it("exclut une question A/B non câblée comme Q44", () => {
+  it("exclut une question A/B non câblée comme Q47", () => {
     const answerable = listAnswerableQuestions();
-    expect(answerable.find((q) => q.id === "Q44")).toBeUndefined();
+    expect(answerable.find((q) => q.id === "Q47")).toBeUndefined();
   });
 });
