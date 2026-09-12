@@ -26,6 +26,8 @@ import { DecisionCenterSection } from "@/components/simulateur/decision-center-s
 import { computeVisitStatusFromState } from "@/lib/decision-center";
 import { AskMyProjectSection } from "@/components/simulateur/ask-my-project-section";
 import { AkiyaPassportSection } from "@/components/simulateur/akiya-passport-section";
+import { FxIntelligenceSection } from "@/components/simulateur/fx-intelligence-section";
+import type { FxRate } from "@/lib/fx";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
 import { RemoteOwnerSection } from "@/components/simulateur/remote-owner-section";
 import { ExitStrategySection } from "@/components/simulateur/exit-strategy-section";
@@ -210,6 +212,10 @@ export function Simulateur() {
     }
   });
   const [subsidiesJpy, setSubsidiesJpy] = useState(0);
+  // Phase AF — taux EUR/JPY réellement sourcé, rafraîchi manuellement par
+  // l'utilisateur (jamais automatique) : null tant qu'aucune consultation
+  // n'a eu lieu dans cette session.
+  const [fxRate, setFxRate] = useState<FxRate | null>(null);
   const [eligibleSubsidies, setEligibleSubsidies] = useState<Subsidy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -728,6 +734,7 @@ export function Simulateur() {
                     capitalDisponibleEur: state.capitalDisponibleEur,
                     reserveSecuriteEur: state.reserveSecuriteEur,
                     comparisonData,
+                    fxRate,
                   }}
                 />
                 <Separator />
@@ -790,6 +797,9 @@ export function Simulateur() {
               snowyRegion={state.snowyRegion}
               includeNeighborhoodAssociation={state.includeNeighborhoodAssociation}
             />
+
+            <Separator />
+            <FxIntelligenceSection onRateFetched={setFxRate} />
 
             {state.realListing && historyOpportunityResult && (
               <>

@@ -47,6 +47,7 @@ const readySnapshot: ProjectSnapshot = {
   capitalDisponibleEur: null,
   reserveSecuriteEur: null,
   comparisonData: [],
+  fxRate: null,
 };
 
 describe("QUESTION_REGISTRY", () => {
@@ -472,6 +473,24 @@ describe("computeQuestionAnswer — Q47 (comparaison objective)", () => {
     expect(answer?.status).toBe("ANSWERED");
     expect(answer?.knownFacts).toEqual(["Maison A : 8.0/10"]);
     expect(answer?.unknowns[0]).toMatch(/Maison B/);
+  });
+});
+
+describe("computeQuestionAnswer — Q46 (sensibilite FX)", () => {
+  it("repond honnetement si aucun taux n'a ete consulte (jamais un taux invente)", () => {
+    const answer = computeQuestionAnswer("Q46", readySnapshot);
+    expect(answer?.status).toBe("PARTIAL");
+    expect(answer?.unknowns).toContain("Taux EUR/JPY daté");
+  });
+
+  it("simule +/-10% sans jamais predire le marche, en citant la source et la date", () => {
+    const answer = computeQuestionAnswer("Q46", {
+      ...readySnapshot,
+      fxRate: { pair: "EUR/JPY", rate: 180, sourceDate: "2026-09-11" },
+    });
+    expect(answer?.status).toBe("ANSWERED");
+    expect(answer?.answer).toMatch(/2026-09-11/);
+    expect(answer?.answer).toMatch(/simulation, jamais une prédiction/i);
   });
 });
 

@@ -27,6 +27,7 @@ import { computeHistoryDiffs, findVisitComparison } from "@/lib/history";
 import { CHECKLIST_TEMPLATE } from "@/lib/due-diligence";
 import type { RiskFlag } from "@/lib/calculations";
 import type { PropertyComparison } from "@/lib/comparison";
+import { computeFxSensitivity, type FxRate } from "@/lib/fx";
 import type {
   ExitStrategyProfile,
   HistoryEntry,
@@ -126,7 +127,7 @@ export const QUESTION_REGISTRY: QuestionDef[] = [
   { id: "Q43", questionFr: "Quelle information pourrait changer le plus mon verdict ?", domain: "next_action", engine: "NEXT_ACTION", cluster: "B", requiredEvidence: "toutes les inconnues critiques + priorités", hardGuardrail: "Pas de ML opaque requis" },
   { id: "Q44", questionFr: "Qu'est-ce qui pourrait faire exploser le budget ?", domain: "finance", engine: "RISK", cluster: "B", requiredEvidence: "inconnues critiques + frais cachés + scénarios travaux", hardGuardrail: "Montant seulement si source/devis" },
   { id: "Q45", questionFr: "Quels coûts sont certains et lesquels sont estimés ?", domain: "finance", engine: "EXPLAINABILITY", cluster: "B", requiredEvidence: "budget segmenté par origine (fait/estimation/utilisateur/inconnu)", hardGuardrail: "Ne jamais mélanger dans un total sans légende" },
-  { id: "Q46", questionFr: "Que se passe-t-il si le yen change ?", domain: "finance", engine: "SENSITIVITY", cluster: "C", requiredEvidence: "taux JPY/EUR daté (API)", hardGuardrail: "Ne pas prédire le marché des changes" },
+  { id: "Q46", questionFr: "Que se passe-t-il si le yen change ?", domain: "finance", engine: "SENSITIVITY", cluster: "B", requiredEvidence: "taux JPY/EUR daté (Frankfurter/BCE)", hardGuardrail: "Ne pas prédire le marché des changes" },
   { id: "Q47", questionFr: "Puis-je comparer deux akiya objectivement ?", domain: "decision", engine: "COMPARISON", cluster: "B", requiredEvidence: "champs normalisés des projets", hardGuardrail: "Ne pas inventer un score manquant" },
   { id: "Q48", questionFr: "La commune est-elle en déclin ?", domain: "market", engine: "LOCAL_CONTEXT", cluster: "C", requiredEvidence: "population_current + population_change_rate (e-Stat)", hardGuardrail: "Déclin démographique ≠ mauvais achat" },
   { id: "Q49", questionFr: "Y a-t-il des services essentiels autour ?", domain: "market", engine: "LOCAL_CONTEXT", cluster: "C", requiredEvidence: "distances gare/santé (données locales)", hardGuardrail: "Pas de note subjective 'bon service'" },
@@ -196,6 +197,9 @@ export interface ProjectSnapshot {
   capitalDisponibleEur: number | null;
   reserveSecuriteEur: number | null;
   comparisonData: PropertyComparison[];
+  // Phase AF — null tant qu'aucune consultation manuelle du taux n'a eu
+  // lieu dans cette session (jamais un taux supposé/en cache silencieux).
+  fxRate: FxRate | null;
 }
 
 function insufficientDataAnswer(def: QuestionDef): QuestionAnswer {
@@ -662,6 +666,38 @@ const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer
       estimates: [],
       unknowns: missingScore.map((c) => `${c.name} : note d'opportunité non calculable (région ou bien réel manquant)`),
       reason: { ruleId: "Q47_comparison", message: "Ne pas inventer un score manquant", fieldsUsed: ["comparisonData"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q46 — "Que se passe-t-il si le yen change ?" : taux réellement sourcé
+  // et daté (Phase AF, Frankfurter/BCE), simulation jamais présentée comme
+  // une prédiction du marché des changes.
+  Q46: (snap) => {
+    if (!snap.fxRate) {
+      return {
+        questionId: "Q46",
+        status: "PARTIAL",
+        verdict: null,
+        answer: "Aucun taux EUR/JPY consulté pour l'instant — utilisez le rafraîchissement manuel (FX Intelligence) pour obtenir un taux daté.",
+        knownFacts: [],
+        estimates: [],
+        unknowns: ["Taux EUR/JPY daté"],
+        reason: { ruleId: "Q46_fx_sensitivity", message: "Taux daté et source", fieldsUsed: ["fxRate"] },
+        nextBestAction: null,
+      };
+    }
+    const sensitivity = computeFxSensitivity(snap.fxRate.rate);
+    const range = `${sensitivity[0].rate.toFixed(2)} – ${sensitivity[sensitivity.length - 1].rate.toFixed(2)} JPY`;
+    return {
+      questionId: "Q46",
+      status: "ANSWERED",
+      verdict: null,
+      answer: `Taux actuel : 1 € = ${snap.fxRate.rate} JPY (source du ${snap.fxRate.sourceDate}). Simulation entre -10% et +10% : ${range} pour 1 €. Une simulation, jamais une prédiction du marché des changes.`,
+      knownFacts: [`Taux du ${snap.fxRate.sourceDate} : 1 € = ${snap.fxRate.rate} JPY`],
+      estimates: [],
+      unknowns: [],
+      reason: { ruleId: "Q46_fx_sensitivity", message: "Ne pas prédire le marché des changes", fieldsUsed: ["fxRate"] },
       nextBestAction: null,
     };
   },
