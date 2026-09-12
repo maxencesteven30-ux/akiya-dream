@@ -24,6 +24,7 @@ import {
   computeMinpakuChecklistSummary,
 } from "@/lib/exit-strategy";
 import { computeHistoryDiffs, findVisitComparison } from "@/lib/history";
+import { CHECKLIST_TEMPLATE } from "@/lib/due-diligence";
 import type {
   ExitStrategyProfile,
   HistoryEntry,
@@ -304,6 +305,235 @@ const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer
   Q16: (snap) => realityGateStatusAnswer("Q16", ["reseau_internet"], snap),
   Q21: (snap) => realityGateStatusAnswer("Q21", ["propriete_titre"], snap),
   Q22: (snap) => realityGateStatusAnswer("Q22", ["propriete_hypotheques"], snap),
+
+  // Q35 — "Que dois-je vérifier avant de faire une offre ?" : la liste
+  // priorisée BLOCKING + CRITICAL_UNKNOWN, jamais tous les items sans
+  // distinction.
+  Q35: (snap) => {
+    const signals = buildNextActionSignals(snap.nextActionInput).filter(
+      (s) => s.level === "BLOCKING" || s.level === "CRITICAL_UNKNOWN",
+    );
+    return {
+      questionId: "Q35",
+      status: "ANSWERED",
+      verdict: signals.some((s) => s.level === "BLOCKING") ? "RED" : signals.length > 0 ? "ORANGE" : "GREEN",
+      answer:
+        signals.length > 0
+          ? `${signals.length} point(s) à vérifier avant toute offre, par priorité décroissante.`
+          : "Aucun blocage ni inconnue critique identifié : rien n'exige de vérification prioritaire avant une offre.",
+      knownFacts: [],
+      estimates: [],
+      unknowns: signals.map((s) => s.reason.message),
+      reason: { ruleId: "Q35_before_offer", message: "Bloquants puis inconnues critiques", fieldsUsed: ["nextActionInput"] },
+      nextBestAction: signals[0]?.message ?? null,
+    };
+  },
+
+  // Q36 — "Que dois-je vérifier pendant la visite ?" : les items due
+  // diligence bâtiment/terrain encore non vérifiés — la checklist
+  // existante réutilisée, pas un nouveau diagnostic.
+  Q36: (snap) => {
+    const { dueDiligence } = snap.nextActionInput;
+    const toVisit = CHECKLIST_TEMPLATE.filter(
+      (item) =>
+        (item.category === "batiment" || item.category === "terrain") &&
+        (dueDiligence[item.id] ?? "a_verifier") === "a_verifier",
+    );
+    return {
+      questionId: "Q36",
+      status: "ANSWERED",
+      verdict: null,
+      answer:
+        toVisit.length > 0
+          ? `${toVisit.length} point(s) à constater sur place (bâtiment/terrain).`
+          : "Tous les points bâtiment/terrain sont déjà renseignés — la visite reste utile pour confirmer, pas pour découvrir.",
+      knownFacts: [],
+      estimates: [],
+      unknowns: toVisit.map((item) => item.label),
+      reason: { ruleId: "Q36_visit", message: "Checklist existante réutilisée", fieldsUsed: ["dueDiligence"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q37 — "Quelles photos dois-je prendre ?" : shot-list dynamique guidée
+  // par les inconnues actuelles, jamais une liste figée.
+  Q37: (snap) => {
+    const { dueDiligence } = snap.nextActionInput;
+    const shotList = CHECKLIST_TEMPLATE.filter(
+      (item) =>
+        (item.category === "batiment" || item.category === "terrain") &&
+        (dueDiligence[item.id] ?? "a_verifier") !== "verifie",
+    ).map((item) => `Photo : ${item.label}`);
+    return {
+      questionId: "Q37",
+      status: "ANSWERED",
+      verdict: null,
+      answer:
+        shotList.length > 0
+          ? `${shotList.length} photo(s) prioritaires à prendre, guidées par les points encore non vérifiés.`
+          : "Aucune photo prioritaire supplémentaire identifiée : les points bâtiment/terrain sont déjà renseignés.",
+      knownFacts: [],
+      estimates: [],
+      unknowns: shotList,
+      reason: { ruleId: "Q37_evidence_capture", message: "Photo guidée par les inconnues actuelles", fieldsUsed: ["dueDiligence"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q53 — "Que dois-je demander à l'agent immobilier ?" : questions
+  // générées depuis les champs juridiques encore non vérifiés (l'agent est
+  // le bon interlocuteur pour ce type de point), jamais des questions déjà
+  // résolues.
+  Q53: (snap) => {
+    const { dueDiligence } = snap.nextActionInput;
+    const questions = CHECKLIST_TEMPLATE.filter(
+      (item) => item.category === "juridique" && (dueDiligence[item.id] ?? "a_verifier") === "a_verifier",
+    ).map((item) => `${item.label} ?`);
+    return {
+      questionId: "Q53",
+      status: "ANSWERED",
+      verdict: null,
+      answer:
+        questions.length > 0
+          ? `${questions.length} question(s) à poser à l'agent immobilier.`
+          : "Aucune question juridique en attente : tous les points de ce type sont déjà renseignés.",
+      knownFacts: [],
+      estimates: [],
+      unknowns: questions,
+      reason: { ruleId: "Q53_agent_questions", message: "Questions générées depuis les inconnues", fieldsUsed: ["dueDiligence"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q54 — "Que dois-je demander au vendeur ?" : uniquement les points déjà
+  // constatés comme "problème" (preuve avant opinion), jamais une
+  // accusation sans preuve.
+  Q54: (snap) => {
+    const { dueDiligence } = snap.nextActionInput;
+    const questions = CHECKLIST_TEMPLATE.filter((item) => dueDiligence[item.id] === "probleme").map(
+      (item) => `Depuis quand le problème "${item.label}" est-il connu, et a-t-il déjà été traité ?`,
+    );
+    return {
+      questionId: "Q54",
+      status: "ANSWERED",
+      verdict: questions.length > 0 ? "ORANGE" : "GREEN",
+      answer:
+        questions.length > 0
+          ? `${questions.length} question(s) à poser au vendeur, basées sur des problèmes déjà constatés.`
+          : "Aucun problème constaté à date : rien à questionner spécifiquement auprès du vendeur.",
+      knownFacts: [],
+      estimates: [],
+      unknowns: questions,
+      reason: { ruleId: "Q54_seller_questions", message: "Preuve avant opinion", fieldsUsed: ["dueDiligence"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q68 — "Quel est mon niveau de préparation avant achat ?" :
+  // complétude et blocages affichés séparément, jamais un score global qui
+  // masquerait un blocage.
+  Q68: (snap) => {
+    const { completion } = snap.nextActionInput;
+    const signals = buildNextActionSignals(snap.nextActionInput);
+    const blockingCount = signals.filter((s) => s.level === "BLOCKING").length;
+    return {
+      questionId: "Q68",
+      status: "ANSWERED",
+      verdict: blockingCount > 0 ? "RED" : completion.percent < 70 ? "ORANGE" : "GREEN",
+      answer: `Dossier complété à ${completion.percent}% (${completion.completed}/${completion.total}). ${blockingCount} blocage(s) actif(s) — la complétude et les blocages sont deux choses distinctes.`,
+      knownFacts: [`Complétude : ${completion.completed}/${completion.total}`],
+      estimates: [],
+      unknowns: signals.filter((s) => s.level !== "OPTIMIZATION").map((s) => s.reason.message),
+      reason: { ruleId: "Q68_readiness", message: "Complétude ≠ sécurité", fieldsUsed: ["completion", "nextActionInput"] },
+      nextBestAction: signals[0]?.message ?? null,
+    };
+  },
+
+  // Q64 — "Quelle source est la plus fiable ?" : hiérarchie de preuve
+  // explicite, jamais une confusion entre confiance et vérité.
+  Q64: () => ({
+    questionId: "Q64",
+    status: "ANSWERED",
+    verdict: null,
+    answer: "Hiérarchie de fiabilité : source officielle (registre, mairie) > document (devis, diagnostic professionnel) > devis > déclaration utilisateur > estimation du moteur. Une confiance élevée ne garantit jamais la vérité absolue.",
+    knownFacts: [],
+    estimates: [],
+    unknowns: [],
+    reason: { ruleId: "Q64_source_quality", message: "Ne pas confondre confiance et vérité", fieldsUsed: [] },
+    nextBestAction: null,
+  }),
+
+  // Q30 — "Les subventions vont-elles réduire mon coût ?" : montant
+  // potentiel affiché, jamais déduit du budget comme acquis.
+  Q30: (snap) => ({
+    questionId: "Q30",
+    status: snap.budget.aidesJpy > 0 ? "ANSWERED" : "PARTIAL",
+    verdict: null,
+    answer:
+      snap.budget.aidesJpy > 0
+        ? `Aide(s) potentielle(s) identifiée(s) : ${snap.budget.aidesJpy.toLocaleString("fr-FR")} JPY — un montant potentiel, jamais acquis avant validation par l'organisme.`
+        : "Aucune subvention identifiée pour ce projet à date.",
+    knownFacts: [],
+    estimates: snap.budget.aidesJpy > 0 ? [`Aide potentielle : ${snap.budget.aidesJpy.toLocaleString("fr-FR")} JPY`] : [],
+    unknowns: [],
+    reason: { ruleId: "Q30_subsidies", message: "Ne jamais déduire une aide du budget comme acquise", fieldsUsed: ["budget.aidesJpy"] },
+    nextBestAction: null,
+  }),
+
+  // Q31/Q32 — Chronologie des aides : règle générale sourcée (Phase 7),
+  // jamais une rétroactivité supposée.
+  Q31: () => ({
+    questionId: "Q31",
+    status: "ANSWERED",
+    verdict: "ORANGE",
+    answer: "En général oui : la plupart des programmes de subvention japonais doivent être demandés avant le début des travaux — ils ne sont pas rétroactifs. Vérifiez le calendrier exact du programme visé avec la municipalité.",
+    knownFacts: [],
+    estimates: [],
+    unknowns: ["Calendrier exact du programme visé"],
+    reason: { ruleId: "Q31_subsidy_timing", message: "Ne pas supposer la rétroactivité", fieldsUsed: [] },
+    nextBestAction: "Vérifier le calendrier de la subvention visée avant tout engagement de travaux.",
+  }),
+  Q32: () => ({
+    questionId: "Q32",
+    status: "ANSWERED",
+    verdict: "ORANGE",
+    answer: "Selon le programme, commencer les travaux trop tôt peut rendre le dossier inéligible — la règle exacte dépend du programme concerné, jamais une généralisation universelle. Vérifiez avant tout engagement.",
+    knownFacts: [],
+    estimates: [],
+    unknowns: ["Règle exacte du programme concerné"],
+    reason: { ruleId: "Q32_subsidy_before_work", message: "Pas de généralisation universelle", fieldsUsed: [] },
+    nextBestAction: "Vérifier auprès de l'organisme si les travaux déjà engagés compromettent l'éligibilité.",
+  }),
+
+  // Q56 — "Puis-je gagner de l'argent avec cette akiya ?" : hypothèses
+  // utilisateur affichées telles quelles, jamais un rendement garanti.
+  Q56: (snap) => {
+    const { monthlyRentJpy, occupancyRatePercent } = snap.exitStrategy;
+    if (monthlyRentJpy === null || occupancyRatePercent === null) {
+      return {
+        questionId: "Q56",
+        status: "PARTIAL",
+        verdict: null,
+        answer: "Aucune hypothèse de location renseignée pour l'instant — sans loyer et taux d'occupation hypothétiques, aucune simulation n'est possible.",
+        knownFacts: [],
+        estimates: [],
+        unknowns: ["Loyer hypothétique", "Taux d'occupation hypothétique"],
+        reason: { ruleId: "Q56_investment", message: "Hypothèses séparées des faits", fieldsUsed: ["exitStrategy"] },
+        nextBestAction: null,
+      };
+    }
+    return {
+      questionId: "Q56",
+      status: "ANSWERED",
+      verdict: null,
+      answer: `Hypothèse saisie : ${monthlyRentJpy.toLocaleString("fr-FR")} JPY/mois à ${occupancyRatePercent}% d'occupation — une simulation d'hypothèse, jamais un rendement garanti.`,
+      knownFacts: [],
+      estimates: [`Loyer hypothétique : ${monthlyRentJpy.toLocaleString("fr-FR")} JPY/mois`, `Occupation hypothétique : ${occupancyRatePercent}%`],
+      unknowns: [],
+      reason: { ruleId: "Q56_investment", message: "Pas de rendement présenté comme garanti", fieldsUsed: ["exitStrategy.monthlyRentJpy", "exitStrategy.occupancyRatePercent"] },
+      nextBestAction: null,
+    };
+  },
 
   // Q06 — "Combien vais-je vraiment payer au total ?" : décomposition
   // acquisition/travaux/total réutilisée telle quelle, jamais un double

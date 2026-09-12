@@ -323,6 +323,82 @@ describe("computeQuestionAnswer — Q06, Q65, Q69, Q70", () => {
   });
 });
 
+describe("computeQuestionAnswer — checklists generees (Q35, Q36, Q37, Q53, Q54, Q68)", () => {
+  it("Q35 liste les blocages et inconnues critiques, jamais les optimisations", () => {
+    const answer = computeQuestionAnswer("Q35", {
+      ...readySnapshot,
+      nextActionInput: { ...readyNextActionInput, landNature: null },
+    });
+    expect(answer?.verdict).toBe("ORANGE");
+    expect(answer?.unknowns.length).toBeGreaterThan(0);
+  });
+
+  it("Q35 repond qu'il n'y a rien a verifier quand tout est vert", () => {
+    const answer = computeQuestionAnswer("Q35", readySnapshot);
+    expect(answer?.verdict).toBe("GREEN");
+  });
+
+  it("Q36 ne liste que les items batiment/terrain non verifies", () => {
+    const dueDiligence = createEmptyChecklist();
+    dueDiligence["batiment_toiture"] = "a_verifier";
+    dueDiligence["vie_locale_gare"] = "a_verifier";
+    const answer = computeQuestionAnswer("Q36", {
+      ...readySnapshot,
+      nextActionInput: { ...readyNextActionInput, dueDiligence, completion: computeCompletionSummary(dueDiligence) },
+    });
+    expect(answer?.unknowns).toContain("Toiture");
+    expect(answer?.unknowns).not.toContain("Gare");
+  });
+
+  it("Q54 ne pose des questions que sur des problemes deja constates (preuve avant opinion)", () => {
+    const dueDiligence = createEmptyChecklist();
+    dueDiligence["batiment_toiture"] = "probleme";
+    const answer = computeQuestionAnswer("Q54", {
+      ...readySnapshot,
+      nextActionInput: { ...readyNextActionInput, dueDiligence, completion: computeCompletionSummary(dueDiligence) },
+    });
+    expect(answer?.verdict).toBe("ORANGE");
+    expect(answer?.unknowns[0]).toMatch(/toiture/i);
+  });
+
+  it("Q54 n'accuse de rien quand aucun probleme n'est constate", () => {
+    const answer = computeQuestionAnswer("Q54", readySnapshot);
+    expect(answer?.verdict).toBe("GREEN");
+    expect(answer?.unknowns).toHaveLength(0);
+  });
+
+  it("Q68 separe explicitement completude et blocages", () => {
+    const realityGate = { ...cleanRealityGate(), [RECONSTRUCTION_ITEM_ID]: "probleme" as const };
+    const answer = computeQuestionAnswer("Q68", {
+      ...readySnapshot,
+      nextActionInput: { ...readyNextActionInput, realityGate, completion: { completed: 29, total: 29, percent: 100, hasProblem: false } },
+    });
+    expect(answer?.verdict).toBe("RED");
+    expect(answer?.answer).toMatch(/100%/);
+  });
+});
+
+describe("computeQuestionAnswer — Q30, Q56 (jamais acquis/garanti par defaut)", () => {
+  it("Q30 ne presente jamais une aide comme acquise", () => {
+    const answer = computeQuestionAnswer("Q30", readySnapshot);
+    expect(answer?.answer).toMatch(/jamais acquis/i);
+  });
+
+  it("Q56 repond honnetement sans hypothese renseignee", () => {
+    const answer = computeQuestionAnswer("Q56", readySnapshot);
+    expect(answer?.status).toBe("PARTIAL");
+  });
+
+  it("Q56 affiche l'hypothese utilisateur sans jamais la presenter comme garantie", () => {
+    const answer = computeQuestionAnswer("Q56", {
+      ...readySnapshot,
+      exitStrategy: { ...createEmptyExitStrategyProfile(), monthlyRentJpy: 50_000, occupancyRatePercent: 80 },
+    });
+    expect(answer?.status).toBe("ANSWERED");
+    expect(answer?.answer).toMatch(/jamais un rendement garanti/i);
+  });
+});
+
 describe("listAnswerableQuestions", () => {
   it("n'inclut que les questions C/D/E ou dotées d'un handler A/B réel", () => {
     const answerable = listAnswerableQuestions();
