@@ -708,6 +708,8 @@ export function Simulateur() {
                     exitStrategy: state.exitStrategy,
                     history: state.history,
                     riskFlags: historyOpportunityResult.riskFlags,
+                    capitalDisponibleEur: state.capitalDisponibleEur,
+                    reserveSecuriteEur: state.reserveSecuriteEur,
                   }}
                 />
               </>

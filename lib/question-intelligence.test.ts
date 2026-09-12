@@ -44,6 +44,8 @@ const readySnapshot: ProjectSnapshot = {
   exitStrategy: createEmptyExitStrategyProfile(),
   history: [],
   riskFlags: [],
+  capitalDisponibleEur: null,
+  reserveSecuriteEur: null,
 };
 
 describe("QUESTION_REGISTRY", () => {
@@ -436,6 +438,24 @@ describe("computeQuestionAnswer — Q44 (facteurs de risque budgetaire)", () => 
   it("repond qu'aucun risque n'est identifie quand tout est vert", () => {
     const answer = computeQuestionAnswer("Q44", readySnapshot);
     expect(answer?.verdict).toBe("GREEN");
+  });
+});
+
+describe("computeQuestionAnswer — Q34 (reserve d'urgence)", () => {
+  it("ne fixe jamais un montant universel : repond PARTIAL si rien n'est renseigne", () => {
+    const answer = computeQuestionAnswer("Q34", readySnapshot);
+    expect(answer?.status).toBe("PARTIAL");
+    expect(answer?.answer).toMatch(/aucun montant universel|il n'existe pas de montant universel/i);
+  });
+
+  it("affiche la reserve reellement saisie sans la comparer a une norme", () => {
+    const answer = computeQuestionAnswer("Q34", {
+      ...readySnapshot,
+      capitalDisponibleEur: 100_000,
+      reserveSecuriteEur: 10_000,
+    });
+    expect(answer?.status).toBe("ANSWERED");
+    expect(answer?.knownFacts[0]).toMatch(/10.000/);
   });
 });
 

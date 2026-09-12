@@ -192,6 +192,8 @@ export interface ProjectSnapshot {
   exitStrategy: ExitStrategyProfile;
   history: HistoryEntry[];
   riskFlags: RiskFlag[];
+  capitalDisponibleEur: number | null;
+  reserveSecuriteEur: number | null;
 }
 
 function insufficientDataAnswer(def: QuestionDef): QuestionAnswer {
@@ -590,6 +592,37 @@ const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer
       unknowns,
       reason: { ruleId: "Q44_budget_shock", message: "Inconnue critique ≠ coût certain", fieldsUsed: ["riskFlags", "nextActionInput"] },
       nextBestAction: signals[0]?.message ?? null,
+    };
+  },
+
+  // Q34 — "Dois-je prévoir une réserve d'urgence ?" : la réserve est une
+  // hypothèse personnelle de l'utilisateur, jamais une valeur universelle
+  // fixée par l'application.
+  Q34: (snap) => {
+    const { capitalDisponibleEur, reserveSecuriteEur } = snap;
+    if (capitalDisponibleEur === null || reserveSecuriteEur === null) {
+      return {
+        questionId: "Q34",
+        status: "PARTIAL",
+        verdict: null,
+        answer: "Capital disponible et réserve de sécurité non encore renseignés — la réserve reste un choix personnel, il n'existe pas de montant universel recommandé.",
+        knownFacts: [],
+        estimates: [],
+        unknowns: ["Capital disponible", "Réserve de sécurité souhaitée"],
+        reason: { ruleId: "Q34_reserve", message: "Ne pas fixer une réserve universelle arbitraire", fieldsUsed: ["capitalDisponibleEur", "reserveSecuriteEur"] },
+        nextBestAction: null,
+      };
+    }
+    return {
+      questionId: "Q34",
+      status: "ANSWERED",
+      verdict: null,
+      answer: `Réserve actuellement prévue : ${reserveSecuriteEur.toLocaleString("fr-FR")} € sur ${capitalDisponibleEur.toLocaleString("fr-FR")} € de capital disponible. Il n'existe pas de montant universel recommandé — c'est un choix personnel selon votre tolérance au risque.`,
+      knownFacts: [`Réserve : ${reserveSecuriteEur.toLocaleString("fr-FR")} €`, `Capital disponible : ${capitalDisponibleEur.toLocaleString("fr-FR")} €`],
+      estimates: [],
+      unknowns: [],
+      reason: { ruleId: "Q34_reserve", message: "Réserve utilisateur explicitement séparée", fieldsUsed: ["capitalDisponibleEur", "reserveSecuriteEur"] },
+      nextBestAction: null,
     };
   },
 
