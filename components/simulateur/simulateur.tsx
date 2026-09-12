@@ -703,6 +703,8 @@ export function Simulateur() {
                       acquisitionJpy: historyOpportunityResult.budget.acquisitionFees.total,
                       aidesJpy: subsidiesJpy,
                     },
+                    remoteOwner: state.remoteOwner,
+                    exitStrategy: state.exitStrategy,
                   }}
                 />
               </>

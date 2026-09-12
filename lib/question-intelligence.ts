@@ -8,7 +8,22 @@ import {
   REALITY_GATE_STATUS_LABELS,
   REALITY_GATE_TEMPLATE,
 } from "@/lib/reality-gate";
-import type { RealityGateItemStatus } from "@/lib/types";
+import {
+  CARETAKER_LABELS,
+  CHECK_FREQUENCY_LABELS,
+  OWNERSHIP_PURPOSE_LABELS,
+  VISA_DISCLAIMER,
+  computeVacancyRisk,
+  shouldShowVisaWarning,
+} from "@/lib/remote-owner";
+import {
+  EXIT_STRATEGY_LABELS,
+  MINPAKU_180_DAYS_DISCLAIMER,
+  RENTAL_FISCALITY_DISCLAIMER,
+  computeDemolitionComparison,
+  computeMinpakuChecklistSummary,
+} from "@/lib/exit-strategy";
+import type { ExitStrategyProfile, RealityGateItemStatus, RemoteOwnerProfile } from "@/lib/types";
 
 // Question Intelligence Engine — dispatcher fixe (aucun NLP, aucune IA
 // générative) qui relie 70 questions réelles d'acheteurs à des règles
@@ -164,6 +179,8 @@ export interface ProjectSnapshot {
     acquisitionJpy: number;
     aidesJpy: number;
   };
+  remoteOwner: RemoteOwnerProfile;
+  exitStrategy: ExitStrategyProfile;
 }
 
 function insufficientDataAnswer(def: QuestionDef): QuestionAnswer {
@@ -280,6 +297,226 @@ const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer
   Q16: (snap) => realityGateStatusAnswer("Q16", ["reseau_internet"], snap),
   Q21: (snap) => realityGateStatusAnswer("Q21", ["propriete_titre"], snap),
   Q22: (snap) => realityGateStatusAnswer("Q22", ["propriete_hypotheques"], snap),
+
+  // Q23 — "Puis-je acheter en tant qu'étranger ?" : règle générale (pas de
+  // restriction de nationalité à l'achat), mais toujours distincte du
+  // droit de séjour (X.5).
+  Q23: () => ({
+    questionId: "Q23",
+    status: "ANSWERED",
+    verdict: "GREEN",
+    answer: `Oui, en règle générale : le Japon n'impose pas de restriction de nationalité à l'achat immobilier. ${VISA_DISCLAIMER}`,
+    knownFacts: ["Aucune restriction de nationalité à l'achat immobilier (règle générale)"],
+    estimates: [],
+    unknowns: [],
+    reason: { ruleId: "Q23_foreign_purchase", message: "Propriété ≠ droit de séjour", fieldsUsed: [] },
+    nextBestAction: null,
+  }),
+
+  // Q24 — "Acheter me donne-t-il le droit de vivre au Japon ?" : jamais de
+  // conseil migratoire personnalisé, garde-fou visa (X.5) réutilisé tel quel.
+  Q24: (snap) => {
+    const warning = shouldShowVisaWarning(
+      snap.remoteOwner.ownershipGoal,
+      snap.remoteOwner.visaPlanConfirmed,
+    );
+    return {
+      questionId: "Q24",
+      status: "ANSWERED",
+      verdict: warning ? "ORANGE" : null,
+      answer: VISA_DISCLAIMER,
+      knownFacts: [],
+      estimates: [],
+      unknowns: warning ? ["Projet de statut de séjour non confirmé pour cet objectif de propriété"] : [],
+      reason: { ruleId: "Q24_residency", message: "Réponse réglementaire séparée du projet immobilier", fieldsUsed: ["remoteOwner.ownershipGoal", "remoteOwner.visaPlanConfirmed"] },
+      nextBestAction: warning ? "Faire confirmer votre statut de séjour prévu auprès des autorités compétentes." : null,
+    };
+  },
+
+  // Q25 — "Puis-je l'utiliser comme résidence secondaire ?" : reflète
+  // l'objectif déclaré (Remote Owner X.3), jamais une règle générique
+  // appliquée à toutes les communes.
+  Q25: (snap) => {
+    const purpose = snap.remoteOwner.ownershipPurpose;
+    return {
+      questionId: "Q25",
+      status: purpose ? "ANSWERED" : "PARTIAL",
+      verdict: null,
+      answer: purpose
+        ? `Objectif déclaré : ${OWNERSHIP_PURPOSE_LABELS[purpose]}. Les conditions locales éventuelles (programmes municipaux, restrictions) restent à vérifier commune par commune.`
+        : "Objectif de propriété non encore renseigné.",
+      knownFacts: purpose ? [`Objectif : ${OWNERSHIP_PURPOSE_LABELS[purpose]}`] : [],
+      estimates: [],
+      unknowns: purpose ? [] : ["Objectif de propriété (résidence secondaire, investissement...)"],
+      reason: { ruleId: "Q25_second_home", message: "Ne pas appliquer une règle d'une autre commune", fieldsUsed: ["remoteOwner.ownershipPurpose"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q26 — "Puis-je la louer quand je n'y suis pas ?" : intention ≠
+  // autorisation, jamais un rendement automatique.
+  Q26: (snap) => {
+    const { strategy } = snap.exitStrategy;
+    const isRental = strategy === "louer";
+    return {
+      questionId: "Q26",
+      status: isRental ? "ANSWERED" : "PARTIAL",
+      verdict: null,
+      answer: isRental
+        ? `Stratégie envisagée : ${EXIT_STRATEGY_LABELS.louer}. ${RENTAL_FISCALITY_DISCLAIMER}`
+        : "Aucune stratégie de location renseignée pour ce projet — l'intention seule n'autorise rien : une checklist réglementaire locale reste nécessaire.",
+      knownFacts: isRental ? [`Stratégie : ${EXIT_STRATEGY_LABELS.louer}`] : [],
+      estimates: [],
+      unknowns: isRental ? [] : ["Stratégie de sortie (Exit Strategy)"],
+      reason: { ruleId: "Q26_rental", message: "Intention ≠ autorisation", fieldsUsed: ["exitStrategy.strategy"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q27 — "Puis-je faire du minpaku/Airbnb ?" : jamais autorisé par
+  // défaut, checklist Y.4 réutilisée telle quelle.
+  Q27: (snap) => {
+    const { strategy, minpakuChecklist } = snap.exitStrategy;
+    if (strategy !== "minpaku") {
+      return {
+        questionId: "Q27",
+        status: "PARTIAL",
+        verdict: null,
+        answer: "Aucune intention de minpaku renseignée pour ce projet.",
+        knownFacts: [],
+        estimates: [],
+        unknowns: ["Intention minpaku (Exit Strategy)"],
+        reason: { ruleId: "Q27_minpaku", message: "Ne jamais conclure autorisé par défaut", fieldsUsed: ["exitStrategy.strategy"] },
+        nextBestAction: null,
+      };
+    }
+    const summary = computeMinpakuChecklistSummary(minpakuChecklist);
+    return {
+      questionId: "Q27",
+      status: "ANSWERED",
+      verdict: summary.completed === summary.total ? "GREEN" : "ORANGE",
+      answer: `Checklist minpaku : ${summary.completed}/${summary.total} éléments vérifiés. ${MINPAKU_180_DAYS_DISCLAIMER}`,
+      knownFacts: [],
+      estimates: [],
+      unknowns: summary.completed < summary.total ? [`${summary.total - summary.completed} élément(s) de la checklist minpaku non vérifiés`] : [],
+      reason: { ruleId: "Q27_minpaku", message: "Ne jamais conclure autorisé par défaut", fieldsUsed: ["exitStrategy.minpakuChecklist"] },
+      nextBestAction: summary.completed < summary.total ? "Compléter la checklist minpaku avant toute mise en location courte durée." : null,
+    };
+  },
+
+  // Q50 — "Qui surveillera la maison ?" : reflète le plan de gestion
+  // déclaré (Remote Owner), jamais une hypothèse sur le voisinage.
+  Q50: (snap) => {
+    const { caretaker, checkFrequency } = snap.remoteOwner;
+    return {
+      questionId: "Q50",
+      status: caretaker && checkFrequency ? "ANSWERED" : "PARTIAL",
+      verdict: null,
+      answer:
+        caretaker && checkFrequency
+          ? `Plan déclaré : ${CARETAKER_LABELS[caretaker]}, vérifications ${CHECK_FREQUENCY_LABELS[checkFrequency].toLowerCase()}.`
+          : "Aucun plan de surveillance renseigné pour l'instant.",
+      knownFacts: caretaker ? [`Responsable : ${CARETAKER_LABELS[caretaker]}`] : [],
+      estimates: [],
+      unknowns: !caretaker || !checkFrequency ? ["Plan de surveillance pendant l'absence"] : [],
+      reason: { ruleId: "Q50_remote_management", message: "Absence de plan = vigilance", fieldsUsed: ["remoteOwner.caretaker", "remoteOwner.checkFrequency"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q51 — "Que risque une maison laissée vide longtemps ?" : réutilise
+  // computeVacancyRisk (X.2) tel quel, jamais une probabilité inventée.
+  Q51: (snap) => {
+    const risk = computeVacancyRisk({
+      vacancyDuration: snap.remoteOwner.vacancyDuration,
+      caretaker: snap.remoteOwner.caretaker,
+      checkFrequency: snap.remoteOwner.checkFrequency,
+    });
+    return {
+      questionId: "Q51",
+      status: "ANSWERED",
+      verdict: risk.level === "rouge" ? "RED" : risk.level === "orange" ? "ORANGE" : "GREEN",
+      answer: risk.label,
+      knownFacts: [],
+      estimates: [],
+      unknowns: risk.reasons,
+      reason: { ruleId: "Q51_vacancy_management", message: "Pas de probabilité inventée", fieldsUsed: ["remoteOwner.vacancyDuration", "remoteOwner.caretaker", "remoteOwner.checkFrequency"] },
+      nextBestAction: risk.level !== "vert" ? "Renforcer le plan de gestion pendant l'absence (fréquence de vérification, personne responsable)." : null,
+    };
+  },
+
+  // Q55 — "Puis-je revendre facilement plus tard ?" : contexte seulement,
+  // jamais une promesse de revente.
+  Q55: () => ({
+    questionId: "Q55",
+    status: "ANSWERED",
+    verdict: null,
+    answer: "La liquidité future d'un bien ne peut pas être prédite par l'application — seul le contexte actuel (marché local, historique) peut être documenté, jamais une garantie de revente.",
+    knownFacts: [],
+    estimates: [],
+    unknowns: ["Liquidité future du marché local"],
+    reason: { ruleId: "Q55_exit_liquidity", message: "Liquidité future non prédictible", fieldsUsed: [] },
+    nextBestAction: null,
+  }),
+
+  // Q57 — "Faut-il démolir plutôt que rénover ?" : le droit de reconstruire
+  // (Reality Gate) doit être vérifié avant toute comparaison de coûts.
+  Q57: (snap) => {
+    const rebuildStatus = snap.nextActionInput.realityGate[RECONSTRUCTION_ITEM_ID] ?? "a_confirmer";
+    if (rebuildStatus !== "verifie") {
+      return {
+        questionId: "Q57",
+        status: "PARTIAL",
+        verdict: "ORANGE",
+        answer: "Le droit à reconstruire n'est pas encore confirmé : comparer rénovation et démolition n'a de sens qu'une fois ce point vérifié — démolir un bien qu'on ne peut pas reconstruire peut rendre le terrain inconstructible.",
+        knownFacts: [],
+        estimates: [],
+        unknowns: ["Droit à reconstruire (Reality Gate)"],
+        reason: { ruleId: "Q57_renovate_vs_demolish", message: "Reconstruction doit être vérifiée d'abord", fieldsUsed: ["realityGate.reconstruction_droit"] },
+        nextBestAction: "Faire confirmer le droit à reconstruire avant d'envisager une démolition.",
+      };
+    }
+    const { demolitionCostJpy } = snap.exitStrategy;
+    if (demolitionCostJpy === null) {
+      return {
+        questionId: "Q57",
+        status: "PARTIAL",
+        verdict: null,
+        answer: "Droit à reconstruire vérifié, mais aucun devis de démolition renseigné pour comparer les coûts.",
+        knownFacts: ["Droit à reconstruire : vérifié"],
+        estimates: [],
+        unknowns: ["Devis de démolition"],
+        reason: { ruleId: "Q57_renovate_vs_demolish", message: "Reconstruction doit être vérifiée d'abord", fieldsUsed: ["exitStrategy.demolitionCostJpy"] },
+        nextBestAction: null,
+      };
+    }
+    const comparison = computeDemolitionComparison(snap.budget.travauxJpy, demolitionCostJpy);
+    return {
+      questionId: "Q57",
+      status: "ANSWERED",
+      verdict: null,
+      answer: `Rénovation estimée : ${comparison.renovationJpy.toLocaleString("fr-FR")} JPY. Démolition (devis) : ${comparison.demolitionJpy.toLocaleString("fr-FR")} JPY. Écart : ${comparison.deltaJpy.toLocaleString("fr-FR")} JPY.`,
+      knownFacts: [`Droit à reconstruire : vérifié`, `Devis démolition : ${comparison.demolitionJpy.toLocaleString("fr-FR")} JPY`],
+      estimates: [`Travaux de rénovation : ${comparison.renovationJpy.toLocaleString("fr-FR")} JPY (hypothèse de niveau, pas un devis)`],
+      unknowns: [],
+      reason: { ruleId: "Q57_renovate_vs_demolish", message: "Comparaison de deux coûts saisis, pas une conclusion de faisabilité", fieldsUsed: ["budget.travauxJpy", "exitStrategy.demolitionCostJpy"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q58 — "Quel est le meilleur scénario, optimiste ou prudent ?" : aucun
+  // scénario n'est "vrai", jamais un choix arbitraire.
+  Q58: () => ({
+    questionId: "Q58",
+    status: "ANSWERED",
+    verdict: null,
+    answer: "Aucun scénario n'est le scénario \"vrai\" : optimiste, réaliste et prudent ne diffèrent que par l'hypothèse de dépassement des travaux (0/+10%/+20%). Le choix dépend de votre tolérance au risque, pas d'une recommandation de l'application.",
+    knownFacts: [],
+    estimates: [],
+    unknowns: [],
+    reason: { ruleId: "Q58_scenario_choice", message: "Aucun scénario 'vrai', ne pas choisir arbitrairement", fieldsUsed: [] },
+    nextBestAction: null,
+  }),
 
 
   // Q02 — "Est-ce vraiment une bonne affaire ?" : les 4 dimensions

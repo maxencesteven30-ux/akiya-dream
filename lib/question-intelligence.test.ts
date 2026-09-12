@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createEmptyChecklist, computeCompletionSummary } from "@/lib/due-diligence";
 import { REALITY_GATE_TEMPLATE, RECONSTRUCTION_ITEM_ID } from "@/lib/reality-gate";
+import { createEmptyRemoteOwnerProfile } from "@/lib/remote-owner";
+import { createEmptyExitStrategyProfile } from "@/lib/exit-strategy";
 import type { NextActionInput } from "@/lib/next-best-action";
 import {
   QUESTION_REGISTRY,
@@ -32,6 +34,8 @@ const readySnapshot: ProjectSnapshot = {
   opportunityScore: 8.2,
   opportunityCategory: "tres_bonne",
   budget: { totalProjetJpy: 13_000_000, travauxJpy: 8_000_000, acquisitionJpy: 700_000, aidesJpy: 2_500_000 },
+  remoteOwner: createEmptyRemoteOwnerProfile(),
+  exitStrategy: createEmptyExitStrategyProfile(),
 };
 
 describe("QUESTION_REGISTRY", () => {
@@ -194,6 +198,72 @@ describe("computeQuestionAnswer — questions Reality Gate génériques (Q03/Q04
       nextActionInput: { ...readyNextActionInput, realityGate },
     });
     expect(answer?.verdict).toBe("RED");
+  });
+});
+
+describe("computeQuestionAnswer — Remote Owner / Exit Strategy (Q24, Q27, Q51, Q57)", () => {
+  it("Q24 signale un avertissement quand l'objectif est 'future_residence' sans plan de séjour confirmé", () => {
+    const answer = computeQuestionAnswer("Q24", {
+      ...readySnapshot,
+      remoteOwner: { ...createEmptyRemoteOwnerProfile(), ownershipGoal: "future_residence" },
+    });
+    expect(answer?.verdict).toBe("ORANGE");
+    expect(answer?.unknowns.length).toBeGreaterThan(0);
+  });
+
+  it("Q24 n'avertit pas quand aucun objectif de résidence future n'est déclaré", () => {
+    const answer = computeQuestionAnswer("Q24", readySnapshot);
+    expect(answer?.verdict).toBeNull();
+  });
+
+  it("Q27 (minpaku) ne conclut jamais autorisé par défaut sans intention déclarée", () => {
+    const answer = computeQuestionAnswer("Q27", readySnapshot);
+    expect(answer?.status).toBe("PARTIAL");
+    expect(answer?.answer).toMatch(/aucune intention/i);
+  });
+
+  it("Q27 (minpaku) reflète la checklist réelle une fois l'intention déclarée", () => {
+    const answer = computeQuestionAnswer("Q27", {
+      ...readySnapshot,
+      exitStrategy: { ...createEmptyExitStrategyProfile(), strategy: "minpaku" },
+    });
+    expect(answer?.status).toBe("ANSWERED");
+    expect(answer?.verdict).toBe("ORANGE");
+  });
+
+  it("Q51 (risque de vacance) ne renvoie jamais une probabilité inventée, seulement des raisons", () => {
+    const answer = computeQuestionAnswer("Q51", {
+      ...readySnapshot,
+      remoteOwner: {
+        ...createEmptyRemoteOwnerProfile(),
+        caretaker: "personne",
+        vacancyDuration: "quelques_mois",
+        checkFrequency: "annuelle",
+      },
+    });
+    expect(answer?.verdict).toBe("RED");
+    for (const reason of answer?.unknowns ?? []) {
+      expect(reason).not.toMatch(/%/);
+    }
+  });
+
+  it("Q57 (démolir vs rénover) refuse de comparer les coûts tant que la reconstruction n'est pas vérifiée", () => {
+    const realityGate = { ...cleanRealityGate(), [RECONSTRUCTION_ITEM_ID]: "a_confirmer" as const };
+    const answer = computeQuestionAnswer("Q57", {
+      ...readySnapshot,
+      nextActionInput: { ...readyNextActionInput, realityGate },
+    });
+    expect(answer?.status).toBe("PARTIAL");
+    expect(answer?.unknowns[0]).toMatch(/droit à reconstruire/i);
+  });
+
+  it("Q57 compare rénovation et démolition seulement une fois la reconstruction vérifiée et le devis renseigné", () => {
+    const answer = computeQuestionAnswer("Q57", {
+      ...readySnapshot,
+      exitStrategy: { ...createEmptyExitStrategyProfile(), demolitionCostJpy: 3_000_000 },
+    });
+    expect(answer?.status).toBe("ANSWERED");
+    expect(answer?.answer).toMatch(/écart/i);
   });
 });
 
