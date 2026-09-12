@@ -49,10 +49,11 @@ interface RealityGateSectionProps {
 // reste, lui, le seul état de vérité.
 const NOT_SET = "non_renseigne";
 
-const CATEGORIES: Array<"acces" | "reconstruction" | "reseaux"> = [
+const CATEGORIES: Array<"acces" | "reconstruction" | "reseaux" | "propriete"> = [
   "acces",
   "reconstruction",
   "reseaux",
+  "propriete",
 ];
 
 const STATUS_OPTIONS: RealityGateItemStatus[] = ["verifie", "a_confirmer", "probleme"];

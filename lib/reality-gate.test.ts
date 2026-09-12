@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   REALITY_GATE_TEMPLATE,
   REALITY_GATE_DOCUMENTS_TEMPLATE,
+  REALITY_GATE_PROBLEM_ACTIONS,
   RECONSTRUCTION_ITEM_ID,
   computeDocumentsAvailability,
   computeLandNatureSeverity,
@@ -19,10 +20,17 @@ describe("REALITY_GATE_TEMPLATE", () => {
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it("couvre les 3 catégories acces/reconstruction/reseaux", () => {
+  it("couvre les 4 catégories acces/reconstruction/reseaux/propriete", () => {
     expect(getItemsByCategory("acces").length).toBeGreaterThan(0);
     expect(getItemsByCategory("reconstruction")).toHaveLength(1);
     expect(getItemsByCategory("reseaux").length).toBeGreaterThan(0);
+    expect(getItemsByCategory("propriete")).toHaveLength(3);
+  });
+
+  it("chaque item du template a une action de résolution dédiée (pas de fallback générique)", () => {
+    for (const item of REALITY_GATE_TEMPLATE) {
+      expect(REALITY_GATE_PROBLEM_ACTIONS[item.id]).toBeTruthy();
+    }
   });
 });
 

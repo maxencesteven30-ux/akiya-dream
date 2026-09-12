@@ -35,7 +35,7 @@ import type {
 
 export interface RealityGateItemDef {
   id: string;
-  category: "acces" | "reconstruction" | "reseaux";
+  category: "acces" | "reconstruction" | "reseaux" | "propriete";
   label: string;
 }
 
@@ -49,6 +49,7 @@ export const CATEGORY_LABELS: Record<RealityGateItemDef["category"], string> = {
   acces: "🛣️ Accès au terrain",
   reconstruction: "🏗️ Droit à reconstruire",
   reseaux: "🔌 Réseaux",
+  propriete: "📜 Propriété & titre",
 };
 
 export const RECONSTRUCTION_ITEM_ID = "reconstruction_droit";
@@ -76,6 +77,17 @@ export const REALITY_GATE_TEMPLATE: RealityGateItemDef[] = [
   { id: "reseau_electricite", category: "reseaux", label: "Électricité" },
   { id: "reseau_gaz", category: "reseaux", label: "Gaz" },
   { id: "reseau_internet", category: "reseaux", label: "Internet" },
+  // Propriété & titre — items ajoutés suite à l'audit du Question
+  // Intelligence Engine (Q21 land_ownership, Q22 inheritance) : "le
+  // terrain est-il à moi avec la maison ?" et "y a-t-il un problème de
+  // succession ?" ne doivent jamais être présumés résolus par défaut.
+  { id: "propriete_titre", category: "propriete", label: "Titre de propriété vérifié" },
+  {
+    id: "propriete_hypotheques",
+    category: "propriete",
+    label: "Absence d'hypothèques/charges enregistrées vérifiée",
+  },
+  { id: "propriete_limites_cadastrales", category: "propriete", label: "Limites cadastrales confirmées" },
 ];
 
 export function createEmptyRealityGate(): RealityGateState {
@@ -194,6 +206,10 @@ export const REALITY_GATE_PROBLEM_ACTIONS: Record<string, string> = {
   reseau_electricite: "Faire vérifier le raccordement électrique.",
   reseau_gaz: "Faire vérifier le raccordement au gaz.",
   reseau_internet: "Faire vérifier la disponibilité d'une connexion internet.",
+  propriete_titre: "Faire vérifier le titre de propriété auprès du registre immobilier (tōki) par un shihō shoshi.",
+  propriete_hypotheques:
+    "Faire vérifier l'absence d'hypothèques ou de charges enregistrées auprès du registre immobilier.",
+  propriete_limites_cadastrales: "Faire clarifier les limites cadastrales avec un géomètre avant toute offre.",
 };
 
 export const LAND_NATURE_PROBLEM_ACTION =
