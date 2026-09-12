@@ -161,6 +161,42 @@ describe("computeQuestionAnswer — Q62 (traçabilité, pas de boîte noire)", (
   });
 });
 
+describe("computeQuestionAnswer — questions Reality Gate génériques (Q03/Q04/Q05/Q13-16/Q21/Q22)", () => {
+  it("Q03 (reconstruction) est GREEN quand l'item est vérifié", () => {
+    const answer = computeQuestionAnswer("Q03", readySnapshot);
+    expect(answer?.verdict).toBe("GREEN");
+    expect(answer?.status).toBe("ANSWERED");
+  });
+
+  it("Q03 (reconstruction) est RED et propose l'action de résolution quand l'item est un problème", () => {
+    const realityGate = { ...cleanRealityGate(), [RECONSTRUCTION_ITEM_ID]: "probleme" as const };
+    const answer = computeQuestionAnswer("Q03", {
+      ...readySnapshot,
+      nextActionInput: { ...readyNextActionInput, realityGate },
+    });
+    expect(answer?.verdict).toBe("RED");
+    expect(answer?.nextBestAction).toMatch(/municipalité/i);
+  });
+
+  it("Q21 (propriété du terrain) est ORANGE par défaut (jamais vert par défaut)", () => {
+    const answer = computeQuestionAnswer("Q21", {
+      ...readySnapshot,
+      nextActionInput: { ...readyNextActionInput, realityGate: {} },
+    });
+    expect(answer?.verdict).toBe("ORANGE");
+    expect(answer?.unknowns[0]).toMatch(/titre de propriété/i);
+  });
+
+  it("Q14 (plomberie) combine eau et égout : un seul problème suffit à passer en rouge", () => {
+    const realityGate = { ...cleanRealityGate(), reseau_egout: "probleme" as const };
+    const answer = computeQuestionAnswer("Q14", {
+      ...readySnapshot,
+      nextActionInput: { ...readyNextActionInput, realityGate },
+    });
+    expect(answer?.verdict).toBe("RED");
+  });
+});
+
 describe("listAnswerableQuestions", () => {
   it("n'inclut que les questions C/D/E ou dotées d'un handler A/B réel", () => {
     const answerable = listAnswerableQuestions();

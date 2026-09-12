@@ -2,6 +2,13 @@ import type { Reason } from "@/lib/data-origin";
 import { buildNextActionSignals, type NextActionInput, type PrioritizedAction } from "@/lib/next-best-action";
 import { computeWhatWouldChangeMyMind } from "@/lib/what-would-change-my-mind";
 import { FEASIBILITY_LABELS, OPPORTUNITY_CATEGORY_LABELS, type OpportunityCategory } from "@/lib/opportunity";
+import {
+  RECONSTRUCTION_ITEM_ID,
+  REALITY_GATE_PROBLEM_ACTIONS,
+  REALITY_GATE_STATUS_LABELS,
+  REALITY_GATE_TEMPLATE,
+} from "@/lib/reality-gate";
+import type { RealityGateItemStatus } from "@/lib/types";
 
 // Question Intelligence Engine — dispatcher fixe (aucun NLP, aucune IA
 // générative) qui relie 70 questions réelles d'acheteurs à des règles
@@ -214,7 +221,67 @@ function routeForSignal(signal: PrioritizedAction): ProfessionalRoute {
   return "mairie";
 }
 
+// Réponse générique pour une question dont l'évidence requise est un
+// sous-ensemble d'items du Property Reality Gate (Q03, Q04, Q05, Q13-16,
+// Q21, Q22) : le statut le plus défavorable des items concernés prime,
+// jamais moyenné — même règle "un problème/une inconnue ne se dilue
+// jamais" que computeRealityGate.
+function realityGateStatusAnswer(questionId: string, itemIds: string[], snap: ProjectSnapshot): QuestionAnswer {
+  const { realityGate } = snap.nextActionInput;
+  const items = itemIds.map((itemId) => ({
+    itemId,
+    label: REALITY_GATE_TEMPLATE.find((i) => i.id === itemId)?.label ?? itemId,
+    status: (realityGate[itemId] ?? "a_confirmer") as RealityGateItemStatus,
+  }));
+  const worst: RealityGateItemStatus = items.some((i) => i.status === "probleme")
+    ? "probleme"
+    : items.some((i) => i.status === "a_confirmer")
+      ? "a_confirmer"
+      : "verifie";
+  const verdict: Verdict = worst === "probleme" ? "RED" : worst === "a_confirmer" ? "ORANGE" : "GREEN";
+  const knownFacts = items.filter((i) => i.status === "verifie").map((i) => `${i.label} : vérifié`);
+  const unknowns = items
+    .filter((i) => i.status !== "verifie")
+    .map((i) => `${i.label} : ${REALITY_GATE_STATUS_LABELS[i.status]}`);
+  const worstItem = items.find((i) => i.status === worst && worst !== "verifie");
+  return {
+    questionId,
+    status: worst === "verifie" ? "ANSWERED" : "PARTIAL",
+    verdict,
+    answer:
+      worst === "verifie"
+        ? "Tous les éléments concernés sont vérifiés."
+        : `${unknowns.length} élément(s) à vérifier avant de considérer ce point comme acquis.`,
+    knownFacts,
+    estimates: [],
+    unknowns,
+    reason: {
+      ruleId: `${questionId}_reality_gate`,
+      message: "Statut directement issu du Property Reality Gate — jamais moyenné",
+      fieldsUsed: itemIds.map((id) => `realityGate.${id}`),
+    },
+    nextBestAction: worstItem ? (REALITY_GATE_PROBLEM_ACTIONS[worstItem.itemId] ?? null) : null,
+  };
+}
+
 const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer> = {
+  Q03: (snap) => realityGateStatusAnswer("Q03", [RECONSTRUCTION_ITEM_ID], snap),
+  Q04: (snap) =>
+    realityGateStatusAnswer(
+      "Q04",
+      ["acces_route_publique", "acces_route_privee", "acces_droit_passage", "acces_servitude"],
+      snap,
+    ),
+  Q05: (snap) =>
+    realityGateStatusAnswer("Q05", ["reseau_eau", "reseau_egout", "reseau_electricite", "reseau_internet"], snap),
+  Q13: (snap) => realityGateStatusAnswer("Q13", ["reseau_electricite"], snap),
+  Q14: (snap) => realityGateStatusAnswer("Q14", ["reseau_eau", "reseau_egout"], snap),
+  Q15: (snap) => realityGateStatusAnswer("Q15", ["reseau_fosse"], snap),
+  Q16: (snap) => realityGateStatusAnswer("Q16", ["reseau_internet"], snap),
+  Q21: (snap) => realityGateStatusAnswer("Q21", ["propriete_titre"], snap),
+  Q22: (snap) => realityGateStatusAnswer("Q22", ["propriete_hypotheques"], snap),
+
+
   // Q02 — "Est-ce vraiment une bonne affaire ?" : les 4 dimensions
   // affichées séparément, un blocage avéré prime toujours sur la note.
   Q02: (snap) => {
