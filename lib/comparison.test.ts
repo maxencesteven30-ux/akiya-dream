@@ -14,6 +14,8 @@ const REGION: Region = {
 const GOOD_LISTING: RealListing = {
   name: "Bien A",
   city: "Test",
+  latitude: null,
+  longitude: null,
   surfaceM2: 80,
   landM2: null,
   constructionYear: 2015,

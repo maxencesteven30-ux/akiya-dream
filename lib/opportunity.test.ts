@@ -33,6 +33,8 @@ const REGION_HIGH_PRE1981: Region = {
 const EMPTY_LISTING: RealListing = {
   name: "Test",
   city: "Test",
+  latitude: null,
+  longitude: null,
   surfaceM2: null,
   landM2: null,
   constructionYear: null,

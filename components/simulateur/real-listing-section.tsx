@@ -16,6 +16,8 @@ import {
 import { computeEstimatedPriceFromSurface } from "@/lib/calculations";
 import { jpyToEur } from "@/lib/data";
 import { formatEur, formatJpy } from "@/lib/format";
+import { computeGeographicPrecision, isValidLatitude, isValidLongitude } from "@/lib/geo-precision";
+import { GEOGRAPHIC_PRECISION_LABELS } from "@/lib/reality-data";
 import type { ListingCondition, RealListing } from "@/lib/types";
 
 const CONDITION_OPTIONS: { value: ListingCondition; label: string }[] = [
@@ -35,6 +37,8 @@ interface RealListingSectionProps {
 const EMPTY_LISTING: RealListing = {
   name: "",
   city: "",
+  latitude: null,
+  longitude: null,
   surfaceM2: null,
   landM2: null,
   constructionYear: null,
@@ -46,6 +50,16 @@ function parseNumber(raw: string): number | null {
   if (raw.trim() === "") return null;
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
+}
+
+function parseLatitude(raw: string): number | null {
+  const value = parseNumber(raw);
+  return value !== null && isValidLatitude(value) ? value : null;
+}
+
+function parseLongitude(raw: string): number | null {
+  const value = parseNumber(raw);
+  return value !== null && isValidLongitude(value) ? value : null;
 }
 
 export function RealListingSection({
@@ -64,6 +78,12 @@ export function RealListingSection({
     listing.constructionYear && listing.surfaceM2
       ? computeEstimatedPriceFromSurface(listing.constructionYear, listing.surfaceM2)
       : null;
+
+  const geographicPrecision = computeGeographicPrecision({
+    city: listing.city,
+    latitude: listing.latitude,
+    longitude: listing.longitude,
+  });
 
   if (!open) {
     return (
@@ -88,6 +108,9 @@ export function RealListingSection({
               (l&apos;année de construction et la distance à la gare, quand vous les
               renseignez, remplacent les moyennes régionales par des données précises
               pour ce bien).
+            </p>
+            <p className="mt-2 text-xs font-medium text-foreground">
+              {GEOGRAPHIC_PRECISION_LABELS[geographicPrecision]}
             </p>
           </div>
           <Button
@@ -123,6 +146,32 @@ export function RealListingSection({
               placeholder="ex. Tsuwano"
               value={listing.city}
               onChange={(e) => update({ city: e.target.value })}
+            />
+          </div>
+          <div>
+            <Label htmlFor="listing-latitude" className="mb-2 block">
+              Latitude (optionnel)
+            </Label>
+            <Input
+              id="listing-latitude"
+              type="number"
+              step="any"
+              placeholder="ex. 36.65"
+              value={listing.latitude ?? ""}
+              onChange={(e) => update({ latitude: parseLatitude(e.target.value) })}
+            />
+          </div>
+          <div>
+            <Label htmlFor="listing-longitude" className="mb-2 block">
+              Longitude (optionnel)
+            </Label>
+            <Input
+              id="listing-longitude"
+              type="number"
+              step="any"
+              placeholder="ex. 138.18"
+              value={listing.longitude ?? ""}
+              onChange={(e) => update({ longitude: parseLongitude(e.target.value) })}
             />
           </div>
           <div>

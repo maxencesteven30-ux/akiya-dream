@@ -16,6 +16,8 @@ const REGION: Region = {
 const LISTING: RealListing = {
   name: "Maison test",
   city: "Test",
+  latitude: null,
+  longitude: null,
   surfaceM2: 80,
   landM2: null,
   constructionYear: 2005,

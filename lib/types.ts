@@ -67,6 +67,11 @@ export type ListingCondition =
 export interface RealListing {
   name: string;
   city: string;
+  // Coordonnées GPS optionnelles (Phase AB — Akiya Reality Data Layer) :
+  // seule une localisation par coordonnées est considérée "précise"
+  // (cf. lib/geo-precision.ts) — jamais déduites de la ville seule.
+  latitude: number | null;
+  longitude: number | null;
   surfaceM2: number | null;
   landM2: number | null;
   constructionYear: number | null;
