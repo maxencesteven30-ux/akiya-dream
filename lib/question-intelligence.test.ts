@@ -36,6 +36,7 @@ const readySnapshot: ProjectSnapshot = {
   budget: { totalProjetJpy: 13_000_000, travauxJpy: 8_000_000, acquisitionJpy: 700_000, aidesJpy: 2_500_000 },
   remoteOwner: createEmptyRemoteOwnerProfile(),
   exitStrategy: createEmptyExitStrategyProfile(),
+  history: [],
 };
 
 describe("QUESTION_REGISTRY", () => {
@@ -79,7 +80,7 @@ describe("computeQuestionAnswer — clusters génériques", () => {
   });
 
   it("retourne null pour une question cluster A/B non encore câblée (pas de réponse inventée)", () => {
-    const answer = computeQuestionAnswer("Q06", readySnapshot);
+    const answer = computeQuestionAnswer("Q08", readySnapshot);
     expect(answer).toBeNull();
   });
 
@@ -267,6 +268,61 @@ describe("computeQuestionAnswer — Remote Owner / Exit Strategy (Q24, Q27, Q51,
   });
 });
 
+describe("computeQuestionAnswer — Q06, Q65, Q69, Q70", () => {
+  it("Q06 sépare acquisition (fait) et travaux (estimation) sans double compter", () => {
+    const answer = computeQuestionAnswer("Q06", readySnapshot);
+    expect(answer?.knownFacts[0]).toMatch(/acquisition/i);
+    expect(answer?.estimates[0]).toMatch(/travaux/i);
+  });
+
+  it("Q65 confirme le filtrage cote serveur (RLS), pas seulement l'UI", () => {
+    const answer = computeQuestionAnswer("Q65", readySnapshot);
+    expect(answer?.verdict).toBe("GREEN");
+    expect(answer?.answer).toMatch(/RLS|Row Level Security/);
+  });
+
+  it("Q69 répond honnêtement quand aucun historique n'existe", () => {
+    const answer = computeQuestionAnswer("Q69", readySnapshot);
+    expect(answer?.answer).toMatch(/aucun point d'étape/i);
+  });
+
+  it("Q70 demande un point d'étape après visite s'il n'y en a pas", () => {
+    const answer = computeQuestionAnswer("Q70", readySnapshot);
+    expect(answer?.status).toBe("PARTIAL");
+  });
+
+  it("Q70 calcule l'écart réel entre avant et après visite quand les deux existent", () => {
+    const answer = computeQuestionAnswer("Q70", {
+      ...readySnapshot,
+      history: [
+        {
+          id: "1",
+          timestamp: "2026-01-01T00:00:00.000Z",
+          housePriceJpy: 5_000_000,
+          travauxJpy: 8_000_000,
+          totalProjetJpy: 13_000_000,
+          eurJpyRate: 160,
+          opportunityScore: 7,
+          isPostVisit: false,
+        },
+        {
+          id: "2",
+          timestamp: "2026-02-01T00:00:00.000Z",
+          housePriceJpy: 4_800_000,
+          travauxJpy: 9_000_000,
+          totalProjetJpy: 13_800_000,
+          eurJpyRate: 160,
+          opportunityScore: 6.5,
+          isPostVisit: true,
+        },
+      ],
+    });
+    expect(answer?.status).toBe("ANSWERED");
+    expect(answer?.answer).toMatch(/-200.000 JPY/);
+    expect(answer?.answer).toMatch(/\+1.000.000 JPY/);
+  });
+});
+
 describe("listAnswerableQuestions", () => {
   it("n'inclut que les questions C/D/E ou dotées d'un handler A/B réel", () => {
     const answerable = listAnswerableQuestions();
@@ -276,8 +332,8 @@ describe("listAnswerableQuestions", () => {
     }
   });
 
-  it("exclut une question A/B non câblée comme Q06", () => {
+  it("exclut une question A/B non câblée comme Q08", () => {
     const answerable = listAnswerableQuestions();
-    expect(answerable.find((q) => q.id === "Q06")).toBeUndefined();
+    expect(answerable.find((q) => q.id === "Q08")).toBeUndefined();
   });
 });

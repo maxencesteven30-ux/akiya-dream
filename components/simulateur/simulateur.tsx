@@ -705,6 +705,7 @@ export function Simulateur() {
                     },
                     remoteOwner: state.remoteOwner,
                     exitStrategy: state.exitStrategy,
+                    history: state.history,
                   }}
                 />
               </>

@@ -23,7 +23,13 @@ import {
   computeDemolitionComparison,
   computeMinpakuChecklistSummary,
 } from "@/lib/exit-strategy";
-import type { ExitStrategyProfile, RealityGateItemStatus, RemoteOwnerProfile } from "@/lib/types";
+import { computeHistoryDiffs, findVisitComparison } from "@/lib/history";
+import type {
+  ExitStrategyProfile,
+  HistoryEntry,
+  RealityGateItemStatus,
+  RemoteOwnerProfile,
+} from "@/lib/types";
 
 // Question Intelligence Engine — dispatcher fixe (aucun NLP, aucune IA
 // générative) qui relie 70 questions réelles d'acheteurs à des règles
@@ -181,6 +187,7 @@ export interface ProjectSnapshot {
   };
   remoteOwner: RemoteOwnerProfile;
   exitStrategy: ExitStrategyProfile;
+  history: HistoryEntry[];
 }
 
 function insufficientDataAnswer(def: QuestionDef): QuestionAnswer {
@@ -297,6 +304,88 @@ const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer
   Q16: (snap) => realityGateStatusAnswer("Q16", ["reseau_internet"], snap),
   Q21: (snap) => realityGateStatusAnswer("Q21", ["propriete_titre"], snap),
   Q22: (snap) => realityGateStatusAnswer("Q22", ["propriete_hypotheques"], snap),
+
+  // Q06 — "Combien vais-je vraiment payer au total ?" : décomposition
+  // acquisition/travaux/total réutilisée telle quelle, jamais un double
+  // comptage.
+  Q06: (snap) => ({
+    questionId: "Q06",
+    status: "ANSWERED",
+    verdict: null,
+    answer: `Total estimé : ${snap.budget.totalProjetJpy.toLocaleString("fr-FR")} JPY (acquisition ${snap.budget.acquisitionJpy.toLocaleString("fr-FR")} JPY + travaux ${snap.budget.travauxJpy.toLocaleString("fr-FR")} JPY). Aides potentielles non garanties : ${snap.budget.aidesJpy.toLocaleString("fr-FR")} JPY.`,
+    knownFacts: [`Acquisition : ${snap.budget.acquisitionJpy.toLocaleString("fr-FR")} JPY`],
+    estimates: [`Travaux : ${snap.budget.travauxJpy.toLocaleString("fr-FR")} JPY`],
+    unknowns: [],
+    reason: { ruleId: "Q06_true_cost", message: "Pas de double comptage", fieldsUsed: ["budget"] },
+    nextBestAction: null,
+  }),
+
+  // Q65 — "Puis-je partager sans révéler mes finances ?" : fait
+  // architectural (partage sécurisé + RLS déjà en place côté serveur, pas
+  // un simple filtrage d'affichage).
+  Q65: () => ({
+    questionId: "Q65",
+    status: "ANSWERED",
+    verdict: "GREEN",
+    answer: "Oui : le partage de projet exclut les champs privés côté serveur (RLS Supabase), pas seulement à l'affichage — un lien partagé ne peut pas exposer vos données financières personnelles.",
+    knownFacts: ["Row Level Security active sur les projets et documents", "Partage sécurisé : filtrage côté serveur, pas seulement UI"],
+    estimates: [],
+    unknowns: [],
+    reason: { ruleId: "Q65_privacy", message: "Pas de filtrage uniquement UI", fieldsUsed: [] },
+    nextBestAction: null,
+  }),
+
+  // Q69 — "Puis-je suivre l'évolution du projet ?" : l'historique existant
+  // (Phase P), jamais réécrit.
+  Q69: (snap) => {
+    const diffs = computeHistoryDiffs(snap.history);
+    return {
+      questionId: "Q69",
+      status: "ANSWERED",
+      verdict: null,
+      answer:
+        diffs.length > 0
+          ? `${diffs.length} point(s) d'étape enregistrés — chaque évolution (prix, travaux, note) reste visible, jamais réécrite.`
+          : "Aucun point d'étape enregistré pour l'instant.",
+      knownFacts: diffs.length > 0 ? [`${diffs.length} point(s) d'étape`] : [],
+      estimates: [],
+      unknowns: [],
+      reason: { ruleId: "Q69_project_timeline", message: "Ne pas réécrire l'historique", fieldsUsed: ["history"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q70 — "Qu'est-ce qui a changé après la visite ?" : réutilise le
+  // comparateur avant/après (Phase R), pas de mécanisme parallèle.
+  Q70: (snap) => {
+    const comparison = findVisitComparison(snap.history);
+    if (!comparison) {
+      return {
+        questionId: "Q70",
+        status: "PARTIAL",
+        verdict: null,
+        answer: "Aucune comparaison avant/après visite disponible : enregistrez un point d'étape marqué 'après visite'.",
+        knownFacts: [],
+        estimates: [],
+        unknowns: ["Point d'étape après visite"],
+        reason: { ruleId: "Q70_visit_delta", message: "Pas de mécanisme parallèle", fieldsUsed: ["history"] },
+        nextBestAction: null,
+      };
+    }
+    const priceDelta = comparison.after.housePriceJpy - comparison.before.housePriceJpy;
+    const travauxDelta = comparison.after.travauxJpy - comparison.before.travauxJpy;
+    return {
+      questionId: "Q70",
+      status: "ANSWERED",
+      verdict: null,
+      answer: `Depuis la visite : prix ${priceDelta >= 0 ? "+" : ""}${priceDelta.toLocaleString("fr-FR")} JPY, travaux ${travauxDelta >= 0 ? "+" : ""}${travauxDelta.toLocaleString("fr-FR")} JPY.`,
+      knownFacts: [`Écart prix : ${priceDelta.toLocaleString("fr-FR")} JPY`, `Écart travaux : ${travauxDelta.toLocaleString("fr-FR")} JPY`],
+      estimates: [],
+      unknowns: [],
+      reason: { ruleId: "Q70_visit_delta", message: "Comparer des points successifs, pas de mécanisme parallèle", fieldsUsed: ["history"] },
+      nextBestAction: null,
+    };
+  },
 
   // Q23 — "Puis-je acheter en tant qu'étranger ?" : règle générale (pas de
   // restriction de nationalité à l'achat), mais toujours distincte du
