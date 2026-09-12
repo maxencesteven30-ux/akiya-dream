@@ -33,7 +33,13 @@ const readySnapshot: ProjectSnapshot = {
   nextActionInput: readyNextActionInput,
   opportunityScore: 8.2,
   opportunityCategory: "tres_bonne",
-  budget: { totalProjetJpy: 13_000_000, travauxJpy: 8_000_000, acquisitionJpy: 700_000, aidesJpy: 2_500_000 },
+  budget: {
+    totalProjetJpy: 13_000_000,
+    travauxJpy: 8_000_000,
+    acquisitionJpy: 700_000,
+    aidesJpy: 2_500_000,
+    maxAffordablePriceJpy: null,
+  },
   remoteOwner: createEmptyRemoteOwnerProfile(),
   exitStrategy: createEmptyExitStrategyProfile(),
   history: [],
@@ -80,7 +86,7 @@ describe("computeQuestionAnswer — clusters génériques", () => {
   });
 
   it("retourne null pour une question cluster A/B non encore câblée (pas de réponse inventée)", () => {
-    const answer = computeQuestionAnswer("Q08", readySnapshot);
+    const answer = computeQuestionAnswer("Q44", readySnapshot);
     expect(answer).toBeNull();
   });
 
@@ -399,6 +405,22 @@ describe("computeQuestionAnswer — Q30, Q56 (jamais acquis/garanti par defaut)"
   });
 });
 
+describe("computeQuestionAnswer — Q08 (plafond financier)", () => {
+  it("repond honnetement si capital/reserve ne sont pas renseignes", () => {
+    const answer = computeQuestionAnswer("Q08", readySnapshot);
+    expect(answer?.status).toBe("PARTIAL");
+  });
+
+  it("affiche le plafond calcule sans jamais le presenter comme une valeur de marche", () => {
+    const answer = computeQuestionAnswer("Q08", {
+      ...readySnapshot,
+      budget: { ...readySnapshot.budget, maxAffordablePriceJpy: 6_000_000 },
+    });
+    expect(answer?.status).toBe("ANSWERED");
+    expect(answer?.answer).toMatch(/n'est pas une valeur de marché/i);
+  });
+});
+
 describe("listAnswerableQuestions", () => {
   it("n'inclut que les questions C/D/E ou dotées d'un handler A/B réel", () => {
     const answerable = listAnswerableQuestions();
@@ -408,8 +430,8 @@ describe("listAnswerableQuestions", () => {
     }
   });
 
-  it("exclut une question A/B non câblée comme Q08", () => {
+  it("exclut une question A/B non câblée comme Q44", () => {
     const answerable = listAnswerableQuestions();
-    expect(answerable.find((q) => q.id === "Q08")).toBeUndefined();
+    expect(answerable.find((q) => q.id === "Q44")).toBeUndefined();
   });
 });

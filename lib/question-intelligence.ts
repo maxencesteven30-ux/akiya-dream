@@ -185,6 +185,7 @@ export interface ProjectSnapshot {
     travauxJpy: number;
     acquisitionJpy: number;
     aidesJpy: number;
+    maxAffordablePriceJpy: number | null;
   };
   remoteOwner: RemoteOwnerProfile;
   exitStrategy: ExitStrategyProfile;
@@ -531,6 +532,36 @@ const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer
       estimates: [`Loyer hypothétique : ${monthlyRentJpy.toLocaleString("fr-FR")} JPY/mois`, `Occupation hypothétique : ${occupancyRatePercent}%`],
       unknowns: [],
       reason: { ruleId: "Q56_investment", message: "Pas de rendement présenté comme garanti", fieldsUsed: ["exitStrategy.monthlyRentJpy", "exitStrategy.occupancyRatePercent"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q08 — "Quel prix maximum puis-je payer ?" : moteur inverse existant,
+  // jamais présenté comme une valeur de marché.
+  Q08: (snap) => {
+    const { maxAffordablePriceJpy } = snap.budget;
+    if (maxAffordablePriceJpy === null) {
+      return {
+        questionId: "Q08",
+        status: "PARTIAL",
+        verdict: null,
+        answer: "Capital disponible ou réserve de sécurité non renseignés — impossible de calculer un plafond sans ces deux valeurs.",
+        knownFacts: [],
+        estimates: [],
+        unknowns: ["Capital disponible", "Réserve de sécurité souhaitée"],
+        reason: { ruleId: "Q08_max_price", message: "Utiliser le moteur inverse existant", fieldsUsed: ["budget.maxAffordablePriceJpy"] },
+        nextBestAction: null,
+      };
+    }
+    return {
+      questionId: "Q08",
+      status: "ANSWERED",
+      verdict: null,
+      answer: `Plafond calculé : ${maxAffordablePriceJpy.toLocaleString("fr-FR")} JPY (prix d'achat), compte tenu de votre capital, réserve et travaux estimés. Ce plafond n'est pas une valeur de marché.`,
+      knownFacts: [`Plafond : ${maxAffordablePriceJpy.toLocaleString("fr-FR")} JPY`],
+      estimates: [],
+      unknowns: [],
+      reason: { ruleId: "Q08_max_price", message: "Le plafond n'est pas une valeur de marché", fieldsUsed: ["budget.maxAffordablePriceJpy"] },
       nextBestAction: null,
     };
   },

@@ -702,6 +702,7 @@ export function Simulateur() {
                       travauxJpy: historyOpportunityResult.budget.travauxJpy,
                       acquisitionJpy: historyOpportunityResult.budget.acquisitionFees.total,
                       aidesJpy: subsidiesJpy,
+                      maxAffordablePriceJpy: historyOpportunityResult.priceTargets.maxAffordablePriceJpy,
                     },
                     remoteOwner: state.remoteOwner,
                     exitStrategy: state.exitStrategy,
