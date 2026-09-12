@@ -25,6 +25,7 @@ import { HistorySection } from "@/components/simulateur/history-section";
 import { DecisionCenterSection } from "@/components/simulateur/decision-center-section";
 import { computeVisitStatusFromState } from "@/lib/decision-center";
 import { AskMyProjectSection } from "@/components/simulateur/ask-my-project-section";
+import { AkiyaPassportSection } from "@/components/simulateur/akiya-passport-section";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
 import { RemoteOwnerSection } from "@/components/simulateur/remote-owner-section";
 import { ExitStrategySection } from "@/components/simulateur/exit-strategy-section";
@@ -513,6 +514,19 @@ export function Simulateur() {
         })
       : null;
 
+  // Réutilisé par Ask My Project et par Akiya Passport (Phase Z) — un seul
+  // assemblage de l'état "signaux" du projet, jamais deux mécanismes
+  // parallèles pour la même donnée.
+  const nextActionInputForQuestions = {
+    realityGate: state.realityGate,
+    landNature: state.landNature,
+    dueDiligence: state.dueDiligence,
+    completion: computeCompletionSummary(state.dueDiligence),
+    feasibility: historyOpportunityResult?.feasibility ?? null,
+    visitStatus: computeVisitStatusFromState(state.visitChecklist),
+    documentsCount: projectDocuments?.length ?? 0,
+  };
+
   // Réutilisé par ExportSection et par Ask My Project (Q47) — un seul
   // calcul, jamais deux moteurs de comparaison parallèles.
   const comparisonData = compareProperties(
@@ -697,15 +711,7 @@ export function Simulateur() {
                 <Separator />
                 <AskMyProjectSection
                   snapshot={{
-                    nextActionInput: {
-                      realityGate: state.realityGate,
-                      landNature: state.landNature,
-                      dueDiligence: state.dueDiligence,
-                      completion: computeCompletionSummary(state.dueDiligence),
-                      feasibility: historyOpportunityResult.feasibility,
-                      visitStatus: computeVisitStatusFromState(state.visitChecklist),
-                      documentsCount: projectDocuments?.length ?? 0,
-                    },
+                    nextActionInput: nextActionInputForQuestions,
                     opportunityScore: historyOpportunityResult.score,
                     opportunityCategory: historyOpportunityResult.category,
                     budget: {
@@ -722,6 +728,23 @@ export function Simulateur() {
                     capitalDisponibleEur: state.capitalDisponibleEur,
                     reserveSecuriteEur: state.reserveSecuriteEur,
                     comparisonData,
+                  }}
+                />
+                <Separator />
+                <AkiyaPassportSection
+                  input={{
+                    propertyName:
+                      state.realListing.name.trim() ||
+                      (state.prefecture ? state.prefecture.replace(/_/g, " ") : "Mon projet"),
+                    opportunityScore: historyOpportunityResult.score,
+                    opportunityCategory: historyOpportunityResult.category,
+                    feasibility: historyOpportunityResult.feasibility,
+                    budget: {
+                      totalProjetJpy: historyOpportunityResult.budget.totalProjetJpy,
+                      travauxJpy: historyOpportunityResult.budget.travauxJpy,
+                      acquisitionJpy: historyOpportunityResult.budget.acquisitionFees.total,
+                    },
+                    nextActionInput: nextActionInputForQuestions,
                   }}
                 />
               </>
