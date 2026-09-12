@@ -160,6 +160,27 @@ export interface RemoteOwnerProfile {
   nonResidentAdmin: NonResidentAdminState;
 }
 
+// Phase Y — Exit Strategy ("et si dans 10 ans je veux partir ?"). Aucune
+// valeur future du bien n'est jamais inventée : resaleValueJpy et
+// demolitionCostJpy sont des hypothèses saisies par l'utilisateur, jamais
+// une estimation calculée par l'application.
+export type ExitStrategy = "garder" | "louer" | "minpaku" | "revendre" | "demolir";
+export type ProjectionHorizonYears = 10 | 20 | 30;
+
+// Checklist minpaku (Y.4) : un élément absent est considéré non traité.
+export type MinpakuChecklistState = Record<string, boolean>;
+
+export interface ExitStrategyProfile {
+  strategy: ExitStrategy | null;
+  horizonYears: ProjectionHorizonYears;
+  // Hypothèses saisies par l'utilisateur, jamais une prédiction de valeur.
+  resaleValueJpy: number | null;
+  monthlyRentJpy: number | null;
+  occupancyRatePercent: number | null;
+  demolitionCostJpy: number | null;
+  minpakuChecklist: MinpakuChecklistState;
+}
+
 // Un point d'étape enregistré manuellement par l'utilisateur (cf.
 // lib/history.ts, Phase P). Propre à un bien précis, comme dueDiligence :
 // réinitialisé quand un autre projet est chargé.
@@ -203,6 +224,7 @@ export interface SimulatorState {
   landNature: LandNature | null;
   realityGateDocuments: RealityGateDocumentsState;
   remoteOwner: RemoteOwnerProfile;
+  exitStrategy: ExitStrategyProfile;
 }
 
 export type BudgetVerdictLevel = "viable" | "tendu" | "non_viable";

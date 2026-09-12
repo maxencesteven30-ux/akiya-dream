@@ -25,13 +25,14 @@ import { HistorySection } from "@/components/simulateur/history-section";
 import { DecisionCenterSection } from "@/components/simulateur/decision-center-section";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
 import { RemoteOwnerSection } from "@/components/simulateur/remote-owner-section";
+import { ExitStrategySection } from "@/components/simulateur/exit-strategy-section";
 import { DocumentsSection } from "@/components/simulateur/documents-section";
 import { SubsidiesSection } from "@/components/simulateur/subsidies-section";
 import { SavedProjectsSection } from "@/components/simulateur/saved-projects-section";
 import { ExportSection } from "@/components/simulateur/export-section";
 import { TaxProjectionSection } from "@/components/simulateur/tax-projection-section";
 import { Roadmap } from "@/components/roadmap/roadmap";
-import { computeBudget, computeBudgetScenarios } from "@/lib/calculations";
+import { calculateAnnualCosts, computeBudget, computeBudgetScenarios } from "@/lib/calculations";
 import { compareProperties } from "@/lib/comparison";
 import { fetchRegionAttributeDetails, fetchRegionAttributes, fetchRegions } from "@/lib/data";
 import { computeOpportunityScore } from "@/lib/opportunity";
@@ -40,6 +41,7 @@ import { createHistoryEntry } from "@/lib/history";
 import { createEmptyVisitChecklist } from "@/lib/visit-checklist";
 import { createEmptyRealityGate, createEmptyRealityGateDocuments } from "@/lib/reality-gate";
 import { createEmptyRemoteOwnerProfile } from "@/lib/remote-owner";
+import { createEmptyExitStrategyProfile } from "@/lib/exit-strategy";
 import { EUR_JPY_RATE } from "@/lib/data";
 import type { ProjectDocument } from "@/lib/documents";
 import type {
@@ -53,6 +55,7 @@ import type {
   PersistedProject,
   RealListing,
   RealityGateItemStatus,
+  ExitStrategyProfile,
   RemoteOwnerProfile,
   RegionAttributeDetail,
   RegionAttributes,
@@ -109,6 +112,7 @@ const DEFAULT_STATE: SimulatorState = {
   landNature: null,
   realityGateDocuments: createEmptyRealityGateDocuments(),
   remoteOwner: createEmptyRemoteOwnerProfile(),
+  exitStrategy: createEmptyExitStrategyProfile(),
 };
 
 export function Simulateur() {
@@ -252,6 +256,7 @@ export function Simulateur() {
       landNature: state.landNature,
       realityGateDocuments: state.realityGateDocuments,
       remoteOwner: state.remoteOwner,
+      exitStrategy: state.exitStrategy,
     };
     try {
       window.localStorage.setItem(SESSION_DRAFT_STORAGE_KEY, JSON.stringify(draft));
@@ -277,6 +282,7 @@ export function Simulateur() {
     state.landNature,
     state.realityGateDocuments,
     state.remoteOwner,
+    state.exitStrategy,
   ]);
 
   useEffect(() => {
@@ -403,6 +409,22 @@ export function Simulateur() {
         nonResidentAdmin: { ...prev.remoteOwner.nonResidentAdmin, [itemId]: done },
       },
     }));
+  const setExitStrategyField = <K extends keyof ExitStrategyProfile>(
+    key: K,
+    value: ExitStrategyProfile[K],
+  ) =>
+    setState((prev) => ({
+      ...prev,
+      exitStrategy: { ...prev.exitStrategy, [key]: value },
+    }));
+  const setMinpakuChecklistItem = (itemId: string, done: boolean) =>
+    setState((prev) => ({
+      ...prev,
+      exitStrategy: {
+        ...prev.exitStrategy,
+        minpakuChecklist: { ...prev.exitStrategy.minpakuChecklist, [itemId]: done },
+      },
+    }));
   const addHistoryCheckpoint = (
     travauxJpy: number,
     totalProjetJpy: number,
@@ -526,6 +548,9 @@ export function Simulateur() {
       // précis (résidence secondaire, investissement...) : repart à zéro
       // sur un autre projet, comme le reste du dossier.
       remoteOwner: createEmptyRemoteOwnerProfile(),
+      // La stratégie de sortie (Phase Y) porte sur ce bien précis
+      // (revente/location/minpaku/démolition) : repart à zéro également.
+      exitStrategy: createEmptyExitStrategyProfile(),
     }));
   };
 
@@ -699,6 +724,28 @@ export function Simulateur() {
               snowyRegion={state.snowyRegion}
               includeNeighborhoodAssociation={state.includeNeighborhoodAssociation}
             />
+
+            {state.realListing && historyOpportunityResult && (
+              <>
+                <Separator />
+                <ExitStrategySection
+                  profile={state.exitStrategy}
+                  onChange={setExitStrategyField}
+                  onMinpakuItemChange={setMinpakuChecklistItem}
+                  prixAchatJpy={state.housePriceJpy}
+                  capitalInvestiJpy={historyOpportunityResult.budget.totalProjetJpy}
+                  travauxJpy={historyOpportunityResult.budget.travauxJpy}
+                  totalAnnuelJpy={
+                    calculateAnnualCosts(
+                      state.housePriceJpy,
+                      state.profile,
+                      state.includeNeighborhoodAssociation,
+                      state.snowyRegion,
+                    ).totalAnnuelJpy
+                  }
+                />
+              </>
+            )}
 
             <Separator />
             <SubsidiesSection
