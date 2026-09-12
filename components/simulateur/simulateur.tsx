@@ -23,6 +23,8 @@ import { VisitChecklistSection } from "@/components/simulateur/visit-checklist-s
 import { OpportunitySection } from "@/components/simulateur/opportunity-section";
 import { HistorySection } from "@/components/simulateur/history-section";
 import { DecisionCenterSection } from "@/components/simulateur/decision-center-section";
+import { computeVisitStatusFromState } from "@/lib/decision-center";
+import { AskMyProjectSection } from "@/components/simulateur/ask-my-project-section";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
 import { RemoteOwnerSection } from "@/components/simulateur/remote-owner-section";
 import { ExitStrategySection } from "@/components/simulateur/exit-strategy-section";
@@ -680,6 +682,28 @@ export function Simulateur() {
                   realityGate={state.realityGate}
                   landNature={state.landNature}
                   documents={state.currentProjectId === null ? null : projectDocuments}
+                />
+                <Separator />
+                <AskMyProjectSection
+                  snapshot={{
+                    nextActionInput: {
+                      realityGate: state.realityGate,
+                      landNature: state.landNature,
+                      dueDiligence: state.dueDiligence,
+                      completion: computeCompletionSummary(state.dueDiligence),
+                      feasibility: historyOpportunityResult.feasibility,
+                      visitStatus: computeVisitStatusFromState(state.visitChecklist),
+                      documentsCount: projectDocuments?.length ?? 0,
+                    },
+                    opportunityScore: historyOpportunityResult.score,
+                    opportunityCategory: historyOpportunityResult.category,
+                    budget: {
+                      totalProjetJpy: historyOpportunityResult.budget.totalProjetJpy,
+                      travauxJpy: historyOpportunityResult.budget.travauxJpy,
+                      acquisitionJpy: historyOpportunityResult.budget.acquisitionFees.total,
+                      aidesJpy: subsidiesJpy,
+                    },
+                  }}
                 />
               </>
             )}
