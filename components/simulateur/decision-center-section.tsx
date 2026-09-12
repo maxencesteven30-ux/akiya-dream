@@ -7,10 +7,11 @@ import {
   VISIT_STATUS_LABELS,
   computeDecision,
   computeDocumentsCoverage,
-  computeNextAction,
   computeVisitStatus,
   type DecisionLevel,
 } from "@/lib/decision-center";
+import { buildNextActionSignals } from "@/lib/next-best-action";
+import { computeWhatWouldChangeMyMind } from "@/lib/what-would-change-my-mind";
 import type { ProjectDocument } from "@/lib/documents";
 import type { CompletionSummary } from "@/lib/due-diligence";
 import { OPPORTUNITY_CATEGORY_LABELS, FEASIBILITY_LABELS } from "@/lib/opportunity";
@@ -45,6 +46,8 @@ interface DecisionCenterSectionProps {
   documents: ProjectDocument[] | null;
 }
 
+const RANK_MEDALS: Record<1 | 2 | 3, string> = { 1: "🥇", 2: "🥈", 3: "🥉" };
+
 const DECISION_STYLES: Record<DecisionLevel, string> = {
   pret: "border-emerald-600/40 bg-emerald-600/10",
   verifications: "border-amber-600/30 bg-amber-600/5",
@@ -78,7 +81,7 @@ export function DecisionCenterSection({
   const dueDiligenceBlockers = CHECKLIST_TEMPLATE.filter((item) => dueDiligence[item.id] === "probleme");
   const realityGateBlockers = REALITY_GATE_TEMPLATE.filter((item) => realityGate[item.id] === "probleme");
   const documentsCoverage = documents ? computeDocumentsCoverage(documents) : null;
-  const nextAction = computeNextAction({
+  const nextActionSignals = buildNextActionSignals({
     realityGate,
     landNature,
     dueDiligence,
@@ -87,6 +90,8 @@ export function DecisionCenterSection({
     visitStatus,
     documentsCount: documentsCoverage?.documentsCount ?? 0,
   });
+  const [nextAction] = nextActionSignals;
+  const mindChangingFactors = computeWhatWouldChangeMyMind(nextActionSignals);
 
   return (
     <motion.section
@@ -208,8 +213,26 @@ export function DecisionCenterSection({
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Prochaine action
           </p>
-          <p className="mt-1 text-sm text-foreground">{nextAction.message}</p>
+          <p className="mt-1 text-sm text-foreground">
+            {nextAction?.message ?? "Projet prêt pour une offre."}
+          </p>
         </div>
+
+        {mindChangingFactors.length > 0 && (
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              🔮 Ce qui pourrait changer le verdict
+            </p>
+            <ul className="mt-1.5 space-y-2 text-sm text-foreground">
+              {mindChangingFactors.map((factor) => (
+                <li key={factor.rank}>
+                  <span aria-hidden>{RANK_MEDALS[factor.rank]}</span> {factor.action}
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{factor.why}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </Card>
     </motion.section>
   );
