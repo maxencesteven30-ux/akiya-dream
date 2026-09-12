@@ -46,6 +46,7 @@ const readySnapshot: ProjectSnapshot = {
   riskFlags: [],
   capitalDisponibleEur: null,
   reserveSecuriteEur: null,
+  comparisonData: [],
 };
 
 describe("QUESTION_REGISTRY", () => {
@@ -86,11 +87,6 @@ describe("computeQuestionAnswer — clusters génériques", () => {
     const answer = computeQuestionAnswer("Q09", readySnapshot);
     expect(answer?.status).toBe("REQUIRES_PROFESSIONAL");
     expect(answer?.answer).toMatch(/professionnel du bâtiment/i);
-  });
-
-  it("retourne null pour une question cluster A/B non encore câblée (pas de réponse inventée)", () => {
-    const answer = computeQuestionAnswer("Q47", readySnapshot);
-    expect(answer).toBeNull();
   });
 
   it("retourne null pour un identifiant de question inconnu", () => {
@@ -459,6 +455,26 @@ describe("computeQuestionAnswer — Q34 (reserve d'urgence)", () => {
   });
 });
 
+describe("computeQuestionAnswer — Q47 (comparaison objective)", () => {
+  it("repond PARTIAL si le comparateur contient moins de 2 projets", () => {
+    const answer = computeQuestionAnswer("Q47", { ...readySnapshot, comparisonData: [] });
+    expect(answer?.status).toBe("PARTIAL");
+  });
+
+  it("compare les memes dimensions pour chaque projet sans inventer de score manquant", () => {
+    const answer = computeQuestionAnswer("Q47", {
+      ...readySnapshot,
+      comparisonData: [
+        { propertyId: "1", name: "Maison A", totalBudgetJpy: 10_000_000, totalBudgetEur: 55_000, opportunityScore: 8, feasibilityVerdict: "✅ Oui", renovationDurationMonths: 4 },
+        { propertyId: "2", name: "Maison B", totalBudgetJpy: 12_000_000, totalBudgetEur: 66_000, opportunityScore: null, feasibilityVerdict: null, renovationDurationMonths: 8 },
+      ],
+    });
+    expect(answer?.status).toBe("ANSWERED");
+    expect(answer?.knownFacts).toEqual(["Maison A : 8.0/10"]);
+    expect(answer?.unknowns[0]).toMatch(/Maison B/);
+  });
+});
+
 describe("listAnswerableQuestions", () => {
   it("n'inclut que les questions C/D/E ou dotées d'un handler A/B réel", () => {
     const answerable = listAnswerableQuestions();
@@ -468,8 +484,8 @@ describe("listAnswerableQuestions", () => {
     }
   });
 
-  it("exclut une question A/B non câblée comme Q47", () => {
+  it("couvre les 70 questions : plus aucune n'est cluster A/B sans handler", () => {
     const answerable = listAnswerableQuestions();
-    expect(answerable.find((q) => q.id === "Q47")).toBeUndefined();
+    expect(answerable).toHaveLength(70);
   });
 });

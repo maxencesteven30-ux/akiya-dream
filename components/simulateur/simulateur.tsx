@@ -513,6 +513,17 @@ export function Simulateur() {
         })
       : null;
 
+  // Réutilisé par ExportSection et par Ask My Project (Q47) — un seul
+  // calcul, jamais deux moteurs de comparaison parallèles.
+  const comparisonData = compareProperties(
+    savedProjects.map((property) => ({
+      property,
+      region: regions.find((r) => r.prefecture === property.prefecture) ?? null,
+      capitalDisponibleEur: state.capitalDisponibleEur,
+      reserveSecuriteEur: state.reserveSecuriteEur,
+    })),
+  );
+
   const loadPersistedProject = (project: PersistedProject) => {
     setState((prev) => ({
       profile: project.profile,
@@ -710,6 +721,7 @@ export function Simulateur() {
                     riskFlags: historyOpportunityResult.riskFlags,
                     capitalDisponibleEur: state.capitalDisponibleEur,
                     reserveSecuriteEur: state.reserveSecuriteEur,
+                    comparisonData,
                   }}
                 />
               </>
@@ -889,14 +901,7 @@ export function Simulateur() {
                 subsidies: eligibleSubsidies,
               }}
               comparisonAvailable={savedProjects.length > 0}
-              comparisonData={compareProperties(
-                savedProjects.map((property) => ({
-                  property,
-                  region: regions.find((r) => r.prefecture === property.prefecture) ?? null,
-                  capitalDisponibleEur: state.capitalDisponibleEur,
-                  reserveSecuriteEur: state.reserveSecuriteEur,
-                })),
-              )}
+              comparisonData={comparisonData}
             />
           </>
         )}

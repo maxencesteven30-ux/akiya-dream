@@ -26,6 +26,7 @@ import {
 import { computeHistoryDiffs, findVisitComparison } from "@/lib/history";
 import { CHECKLIST_TEMPLATE } from "@/lib/due-diligence";
 import type { RiskFlag } from "@/lib/calculations";
+import type { PropertyComparison } from "@/lib/comparison";
 import type {
   ExitStrategyProfile,
   HistoryEntry,
@@ -194,6 +195,7 @@ export interface ProjectSnapshot {
   riskFlags: RiskFlag[];
   capitalDisponibleEur: number | null;
   reserveSecuriteEur: number | null;
+  comparisonData: PropertyComparison[];
 }
 
 function insufficientDataAnswer(def: QuestionDef): QuestionAnswer {
@@ -622,6 +624,44 @@ const BESPOKE_HANDLERS: Record<string, (snap: ProjectSnapshot) => QuestionAnswer
       estimates: [],
       unknowns: [],
       reason: { ruleId: "Q34_reserve", message: "Réserve utilisateur explicitement séparée", fieldsUsed: ["capitalDisponibleEur", "reserveSecuriteEur"] },
+      nextBestAction: null,
+    };
+  },
+
+  // Q47 — "Puis-je comparer deux akiya objectivement ?" : les mêmes
+  // dimensions pour chaque bien (moteur du comparateur déjà existant),
+  // jamais un score inventé pour un bien dont les données manquent.
+  Q47: (snap) => {
+    const { comparisonData } = snap;
+    if (comparisonData.length < 2) {
+      return {
+        questionId: "Q47",
+        status: "PARTIAL",
+        verdict: null,
+        answer: `Le comparateur contient ${comparisonData.length} projet(s) — ajoutez au moins un second bien au comparateur pour obtenir une comparaison.`,
+        knownFacts: [],
+        estimates: [],
+        unknowns: ["Au moins un second projet dans le comparateur"],
+        reason: { ruleId: "Q47_comparison", message: "Comparer les mêmes dimensions", fieldsUsed: ["comparisonData"] },
+        nextBestAction: null,
+      };
+    }
+    const missingScore = comparisonData.filter((c) => c.opportunityScore === null);
+    const summary = comparisonData
+      .map(
+        (c) =>
+          `${c.name} : opportunité ${c.opportunityScore !== null ? `${c.opportunityScore.toFixed(1)}/10` : "non calculable"}, budget ${c.totalBudgetJpy.toLocaleString("fr-FR")} JPY, faisabilité ${c.feasibilityVerdict ?? "non renseignée"}`,
+      )
+      .join(" | ");
+    return {
+      questionId: "Q47",
+      status: "ANSWERED",
+      verdict: null,
+      answer: summary,
+      knownFacts: comparisonData.filter((c) => c.opportunityScore !== null).map((c) => `${c.name} : ${c.opportunityScore!.toFixed(1)}/10`),
+      estimates: [],
+      unknowns: missingScore.map((c) => `${c.name} : note d'opportunité non calculable (région ou bien réel manquant)`),
+      reason: { ruleId: "Q47_comparison", message: "Ne pas inventer un score manquant", fieldsUsed: ["comparisonData"] },
       nextBestAction: null,
     };
   },
