@@ -12,6 +12,7 @@ import {
 } from "@/lib/decision-center";
 import { buildNextActionSignals } from "@/lib/next-best-action";
 import { computeWhatWouldChangeMyMind } from "@/lib/what-would-change-my-mind";
+import { explainSignal, PROVENANCE_LABELS } from "@/lib/evidence-graph";
 import type { ProjectDocument } from "@/lib/documents";
 import type { CompletionSummary } from "@/lib/due-diligence";
 import { OPPORTUNITY_CATEGORY_LABELS, FEASIBILITY_LABELS } from "@/lib/opportunity";
@@ -216,6 +217,39 @@ export function DecisionCenterSection({
           <p className="mt-1 text-sm text-foreground">
             {nextAction?.message ?? "Projet prêt pour une offre."}
           </p>
+
+          {nextAction && (
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer select-none text-muted-foreground hover:text-foreground">
+                🔍 Pourquoi ?
+              </summary>
+              <div className="mt-2 space-y-2 border-l-2 border-border pl-3">
+                {(() => {
+                  const node = explainSignal(nextAction);
+                  return (
+                    <>
+                      <p className="text-foreground">{node.reasonMessage}</p>
+                      <p className="text-muted-foreground">
+                        Règle : <span className="font-mono">{node.ruleId}</span>
+                      </p>
+                      {node.facts.length > 0 && (
+                        <div>
+                          <p className="font-medium text-muted-foreground">Données utilisées</p>
+                          <ul className="mt-1 space-y-0.5">
+                            {node.facts.map((fact) => (
+                              <li key={fact.fieldPath} className="text-muted-foreground">
+                                {PROVENANCE_LABELS[fact.provenance]} — <span className="font-mono">{fact.fieldPath}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+            </details>
+          )}
         </div>
 
         {mindChangingFactors.length > 0 && (
