@@ -32,6 +32,7 @@ import { MarketContextSection } from "@/components/simulateur/market-context-sec
 import { HazardSection } from "@/components/simulateur/hazard-section";
 import { DemographicsSection } from "@/components/simulateur/demographics-section";
 import { AmenitiesSection } from "@/components/simulateur/amenities-section";
+import { StationsSection } from "@/components/simulateur/stations-section";
 import type { CrossSourceContext } from "@/lib/cross-source-context";
 import type { FxRate } from "@/lib/fx";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
@@ -844,6 +845,11 @@ export function Simulateur() {
                 />
                 <Separator />
                 <AmenitiesSection
+                  latitude={state.realListing.latitude}
+                  longitude={state.realListing.longitude}
+                />
+                <Separator />
+                <StationsSection
                   latitude={state.realListing.latitude}
                   longitude={state.realListing.longitude}
                 />
