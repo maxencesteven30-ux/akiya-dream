@@ -4,6 +4,7 @@ import {
   parseAreaM2,
   parseBuildingYearTerm,
   parseFloorPlan,
+  parsePriceJpy,
   parseRebuildabilityTerm,
   parseSewageTerm,
   parseWalkingDistance,
@@ -111,6 +112,25 @@ describe("parseBuildingYearTerm", () => {
 
   it("retourne null si aucun format reconnu, jamais une année devinée", () => {
     expect(parseBuildingYearTerm("ancien")).toBeNull();
+  });
+});
+
+describe("parsePriceJpy", () => {
+  it("parse '300万円' (convention des dizaines de milliers de yens)", () => {
+    expect(parsePriceJpy("300万円")).toBe(3_000_000);
+  });
+
+  it("parse '3,000,000円' (montant direct en yens)", () => {
+    expect(parsePriceJpy("3,000,000円")).toBe(3_000_000);
+  });
+
+  it("parse un montant brut sans 円", () => {
+    expect(parsePriceJpy("3000000")).toBe(3_000_000);
+  });
+
+  it("retourne null pour un format non numérique, jamais un prix deviné", () => {
+    expect(parsePriceJpy("価格応相談")).toBeNull();
+    expect(parsePriceJpy("")).toBeNull();
   });
 });
 

@@ -100,3 +100,24 @@ export function parseBuildingYearTerm(raw: string, currentYear = new Date().getF
 export function isMarkedAsAkiya(raw: string): boolean {
   return raw.includes("空き家");
 }
+
+// Prix : soit un montant en chiffres suivi de 円 ("3,000,000円"), soit
+// la convention "X万円" (X dizaines de milliers de yens — "300万円" =
+// 3 000 000 円). Les deux formats coexistent sur les sites municipaux ;
+// jamais mélangés silencieusement, jamais une virgule de milliers prise
+// pour un séparateur décimal.
+export function parsePriceJpy(raw: string): number | null {
+  const man = raw.match(/([\d,]+(?:\.\d+)?)\s*万\s*円/);
+  if (man) {
+    const value = Number(man[1].replace(/,/g, "")) * 10_000;
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const yen = raw.match(/^([\d,]+)\s*円?$/);
+  if (yen) {
+    const value = Number(yen[1].replace(/,/g, ""));
+    return Number.isFinite(value) ? value : null;
+  }
+
+  return null;
+}
