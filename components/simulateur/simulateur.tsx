@@ -29,6 +29,8 @@ import { AskMyProjectSection } from "@/components/simulateur/ask-my-project-sect
 import { AkiyaPassportSection } from "@/components/simulateur/akiya-passport-section";
 import { FxIntelligenceSection } from "@/components/simulateur/fx-intelligence-section";
 import { MarketContextSection } from "@/components/simulateur/market-context-section";
+import { HazardSection } from "@/components/simulateur/hazard-section";
+import { DemographicsSection } from "@/components/simulateur/demographics-section";
 import type { CrossSourceContext } from "@/lib/cross-source-context";
 import type { FxRate } from "@/lib/fx";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
@@ -827,6 +829,17 @@ export function Simulateur() {
                   latitude={state.realListing.latitude}
                   longitude={state.realListing.longitude}
                   onCrossSourceContextComputed={setCrossSourceContext}
+                />
+                <Separator />
+                <HazardSection
+                  latitude={state.realListing.latitude}
+                  longitude={state.realListing.longitude}
+                />
+                <Separator />
+                <DemographicsSection
+                  latitude={state.realListing.latitude}
+                  longitude={state.realListing.longitude}
+                  municipalityCode={state.realListing.municipalityCode}
                 />
               </>
             )}
