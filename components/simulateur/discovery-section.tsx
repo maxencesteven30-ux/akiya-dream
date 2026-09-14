@@ -91,6 +91,10 @@ function triStateValue(value: boolean | null): string {
   return "unknown";
 }
 
+function triStateLabel(value: string): string {
+  return TRI_STATE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
 const REBUILDABILITY_HINT_LABELS: Partial<Record<RealityGateItemStatus, string>> = {
   verifie: "droit de reconstruire confirmé",
   probleme: "non reconstructible (再建築不可)",
@@ -277,248 +281,269 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
         />
 
         {editingId !== null && (
-          <div className="mt-4 flex items-center justify-between rounded-md border border-amber-600/40 bg-amber-600/10 px-3 py-2 text-xs text-amber-700">
-            <span>Modification de l&apos;annonce {intake.source} #{intake.sourceListingId}</span>
+          <div className="mt-4 flex items-center justify-between rounded-md border border-amber-600/30 bg-amber-600/5 px-3 py-2 text-xs">
+            <span className="text-foreground">
+              Modification de l&apos;annonce {intake.source} #{intake.sourceListingId}
+            </span>
             <Button variant="ghost" size="sm" onClick={cancelEdit}>
               Annuler
             </Button>
           </div>
         )}
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <Label htmlFor="discovery-source" className="mb-2 block">
-              Source (ex. tomi-city-akiyabank)
-            </Label>
-            <Input
-              id="discovery-source"
-              value={intake.source}
-              onChange={(e) => update({ source: e.target.value })}
-            />
+        <FormSection title="Identification">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="discovery-source" className="mb-2 block">
+                Source (ex. tomi-city-akiyabank)
+              </Label>
+              <Input
+                id="discovery-source"
+                value={intake.source}
+                onChange={(e) => update({ source: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="discovery-source-id" className="mb-2 block">
+                Numéro d&apos;annonce
+              </Label>
+              <Input
+                id="discovery-source-id"
+                placeholder="ex. 322"
+                value={intake.sourceListingId}
+                onChange={(e) => update({ sourceListingId: e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="discovery-source-url" className="mb-2 block">
+                URL de l&apos;annonce (optionnel)
+              </Label>
+              <Input
+                id="discovery-source-url"
+                value={intake.sourceUrl ?? ""}
+                onChange={(e) => update({ sourceUrl: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="discovery-title" className="mb-2 block">
+                Titre (optionnel)
+              </Label>
+              <Input
+                id="discovery-title"
+                value={intake.title ?? ""}
+                onChange={(e) => update({ title: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+            </div>
           </div>
-          <div>
-            <Label htmlFor="discovery-source-id" className="mb-2 block">
-              Numéro d&apos;annonce
-            </Label>
-            <Input
-              id="discovery-source-id"
-              placeholder="ex. 322"
-              value={intake.sourceListingId}
-              onChange={(e) => update({ sourceListingId: e.target.value })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="discovery-source-url" className="mb-2 block">
-              URL de l&apos;annonce (optionnel)
-            </Label>
-            <Input
-              id="discovery-source-url"
-              value={intake.sourceUrl ?? ""}
-              onChange={(e) => update({ sourceUrl: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="discovery-title" className="mb-2 block">
-              Titre (optionnel)
-            </Label>
-            <Input
-              id="discovery-title"
-              value={intake.title ?? ""}
-              onChange={(e) => update({ title: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="discovery-price" className="mb-2 block">
-              Prix tel qu&apos;affiché (ex. 300万円)
-            </Label>
-            <Input
-              id="discovery-price"
-              value={intake.priceRaw ?? ""}
-              onChange={(e) => update({ priceRaw: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-            <ParseHint raw={intake.priceRaw} hint={priceHint} />
-          </div>
-          <div>
-            <Label htmlFor="discovery-prefecture" className="mb-2 block">
-              Préfecture
-            </Label>
-            <Input
-              id="discovery-prefecture"
-              placeholder="ex. 長野県"
-              value={intake.prefecture ?? ""}
-              onChange={(e) => update({ prefecture: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="discovery-municipality" className="mb-2 block">
-              Municipalité
-            </Label>
-            <Input
-              id="discovery-municipality"
-              placeholder="ex. 東御市"
-              value={intake.municipality ?? ""}
-              onChange={(e) => update({ municipality: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="discovery-land-area" className="mb-2 block">
-              Surface terrain telle qu&apos;affichée (ex. 250㎡)
-            </Label>
-            <Input
-              id="discovery-land-area"
-              value={intake.landAreaRaw ?? ""}
-              onChange={(e) => update({ landAreaRaw: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-            <ParseHint raw={intake.landAreaRaw} hint={landAreaHint} />
-          </div>
-          <div>
-            <Label htmlFor="discovery-building-area" className="mb-2 block">
-              Surface habitable telle qu&apos;affichée (ex. 90m²)
-            </Label>
-            <Input
-              id="discovery-building-area"
-              value={intake.buildingAreaRaw ?? ""}
-              onChange={(e) => update({ buildingAreaRaw: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-            <ParseHint raw={intake.buildingAreaRaw} hint={buildingAreaHint} />
-          </div>
-          <div>
-            <Label htmlFor="discovery-floor-plan" className="mb-2 block">
-              間取り tel qu&apos;affiché (ex. 3LDK)
-            </Label>
-            <Input
-              id="discovery-floor-plan"
-              value={intake.floorPlanRaw ?? ""}
-              onChange={(e) => update({ floorPlanRaw: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-            <ParseHint raw={intake.floorPlanRaw} hint={floorPlanHint} />
-          </div>
-          <div>
-            <Label htmlFor="discovery-building-year" className="mb-2 block">
-              Année/âge tel qu&apos;affiché (ex. 1985年建築 ou 築30年)
-            </Label>
-            <Input
-              id="discovery-building-year"
-              value={intake.buildingYearRaw ?? ""}
-              onChange={(e) => update({ buildingYearRaw: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-            <ParseHint raw={intake.buildingYearRaw} hint={buildingYearHint} />
-          </div>
-          <div>
-            <Label htmlFor="discovery-station-distance" className="mb-2 block">
-              Distance à la gare telle qu&apos;affichée (ex. 徒歩15分)
-            </Label>
-            <Input
-              id="discovery-station-distance"
-              value={intake.stationDistanceRaw ?? ""}
-              onChange={(e) =>
-                update({ stationDistanceRaw: e.target.value.trim() === "" ? null : e.target.value })
-              }
-            />
-            <ParseHint raw={intake.stationDistanceRaw} hint={stationDistanceHint} />
-          </div>
-          <div>
-            <Label htmlFor="discovery-rebuildability" className="mb-2 block">
-              Droit de reconstruire tel qu&apos;affiché (ex. 再建築可)
-            </Label>
-            <Input
-              id="discovery-rebuildability"
-              value={intake.rebuildabilityRaw ?? ""}
-              onChange={(e) =>
-                update({ rebuildabilityRaw: e.target.value.trim() === "" ? null : e.target.value })
-              }
-            />
-            <ParseHint raw={intake.rebuildabilityRaw} hint={rebuildabilityHint} />
-          </div>
-          <div>
-            <Label htmlFor="discovery-sewage" className="mb-2 block">
-              Assainissement tel qu&apos;affiché (ex. 浄化槽)
-            </Label>
-            <Input
-              id="discovery-sewage"
-              value={intake.sewageRaw ?? ""}
-              onChange={(e) => update({ sewageRaw: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-            <ParseHint raw={intake.sewageRaw} hint={sewageHint} />
-          </div>
-          <div>
-            <Label htmlFor="discovery-property-type" className="mb-2 block">
-              Catégorie brute telle qu&apos;affichée (ex. 宅地, 山林, 畑)
-            </Label>
-            <Input
-              id="discovery-property-type"
-              value={intake.propertyType ?? ""}
-              onChange={(e) => update({ propertyType: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-          </div>
-          <div className="sm:col-span-2">
-            <Label htmlFor="discovery-description" className="mb-2 block">
-              Description recopiée (optionnel)
-            </Label>
-            <textarea
-              id="discovery-description"
-              className="flex min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
-              value={intake.descriptionRaw ?? ""}
-              onChange={(e) => update({ descriptionRaw: e.target.value.trim() === "" ? null : e.target.value })}
-            />
-          </div>
-          <div>
-            <Label htmlFor="discovery-availability" className="mb-2 block">
-              Statut de l&apos;annonce
-            </Label>
-            <Select
-              value={intake.availabilityStatus}
-              onValueChange={(v) => update({ availabilityStatus: v as ManualIntakeInput["availabilityStatus"] })}
-            >
-              <SelectTrigger id="discovery-availability">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {AVAILABILITY_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="discovery-garden" className="mb-2 block">
-              Jardin
-            </Label>
-            <Select value={triStateValue(intake.hasGarden)} onValueChange={(v) => update({ hasGarden: parseTriState(v) })}>
-              <SelectTrigger id="discovery-garden">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRI_STATE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label htmlFor="discovery-parking" className="mb-2 block">
-              Parking
-            </Label>
-            <Select value={triStateValue(intake.hasParking)} onValueChange={(v) => update({ hasParking: parseTriState(v) })}>
-              <SelectTrigger id="discovery-parking">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {TRI_STATE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        </FormSection>
 
-        <div className="mt-4">
+        <FormSection title="Localisation & prix">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="discovery-price" className="mb-2 block">
+                Prix tel qu&apos;affiché (ex. 300万円)
+              </Label>
+              <Input
+                id="discovery-price"
+                value={intake.priceRaw ?? ""}
+                onChange={(e) => update({ priceRaw: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+              <ParseHint raw={intake.priceRaw} hint={priceHint} />
+            </div>
+            <div>
+              <Label htmlFor="discovery-prefecture" className="mb-2 block">
+                Préfecture
+              </Label>
+              <Input
+                id="discovery-prefecture"
+                placeholder="ex. 長野県"
+                value={intake.prefecture ?? ""}
+                onChange={(e) => update({ prefecture: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="discovery-municipality" className="mb-2 block">
+                Municipalité
+              </Label>
+              <Input
+                id="discovery-municipality"
+                placeholder="ex. 東御市"
+                value={intake.municipality ?? ""}
+                onChange={(e) => update({ municipality: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="discovery-station-distance" className="mb-2 block">
+                Distance à la gare telle qu&apos;affichée (ex. 徒歩15分)
+              </Label>
+              <Input
+                id="discovery-station-distance"
+                value={intake.stationDistanceRaw ?? ""}
+                onChange={(e) =>
+                  update({ stationDistanceRaw: e.target.value.trim() === "" ? null : e.target.value })
+                }
+              />
+              <ParseHint raw={intake.stationDistanceRaw} hint={stationDistanceHint} />
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection title="Caractéristiques du bien">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="discovery-land-area" className="mb-2 block">
+                Surface terrain telle qu&apos;affichée (ex. 250㎡)
+              </Label>
+              <Input
+                id="discovery-land-area"
+                value={intake.landAreaRaw ?? ""}
+                onChange={(e) => update({ landAreaRaw: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+              <ParseHint raw={intake.landAreaRaw} hint={landAreaHint} />
+            </div>
+            <div>
+              <Label htmlFor="discovery-building-area" className="mb-2 block">
+                Surface habitable telle qu&apos;affichée (ex. 90m²)
+              </Label>
+              <Input
+                id="discovery-building-area"
+                value={intake.buildingAreaRaw ?? ""}
+                onChange={(e) => update({ buildingAreaRaw: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+              <ParseHint raw={intake.buildingAreaRaw} hint={buildingAreaHint} />
+            </div>
+            <div>
+              <Label htmlFor="discovery-floor-plan" className="mb-2 block">
+                間取り tel qu&apos;affiché (ex. 3LDK)
+              </Label>
+              <Input
+                id="discovery-floor-plan"
+                value={intake.floorPlanRaw ?? ""}
+                onChange={(e) => update({ floorPlanRaw: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+              <ParseHint raw={intake.floorPlanRaw} hint={floorPlanHint} />
+            </div>
+            <div>
+              <Label htmlFor="discovery-building-year" className="mb-2 block">
+                Année/âge tel qu&apos;affiché (ex. 1985年建築 ou 築30年)
+              </Label>
+              <Input
+                id="discovery-building-year"
+                value={intake.buildingYearRaw ?? ""}
+                onChange={(e) => update({ buildingYearRaw: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+              <ParseHint raw={intake.buildingYearRaw} hint={buildingYearHint} />
+            </div>
+            <div>
+              <Label htmlFor="discovery-property-type" className="mb-2 block">
+                Catégorie brute telle qu&apos;affichée (ex. 宅地, 山林, 畑)
+              </Label>
+              <Input
+                id="discovery-property-type"
+                value={intake.propertyType ?? ""}
+                onChange={(e) => update({ propertyType: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+            </div>
+            <div>
+              <Label htmlFor="discovery-availability" className="mb-2 block">
+                Statut de l&apos;annonce
+              </Label>
+              <Select
+                value={intake.availabilityStatus}
+                onValueChange={(v) => update({ availabilityStatus: v as ManualIntakeInput["availabilityStatus"] })}
+              >
+                <SelectTrigger id="discovery-availability">
+                  <SelectValue>
+                    {(v: ManualIntakeInput["availabilityStatus"]) => LISTING_AVAILABILITY_LABELS[v] ?? v}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {AVAILABILITY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="discovery-garden" className="mb-2 block">
+                Jardin
+              </Label>
+              <Select value={triStateValue(intake.hasGarden)} onValueChange={(v) => update({ hasGarden: parseTriState(v) })}>
+                <SelectTrigger id="discovery-garden">
+                  <SelectValue>{triStateLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TRI_STATE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="discovery-parking" className="mb-2 block">
+                Parking
+              </Label>
+              <Select value={triStateValue(intake.hasParking)} onValueChange={(v) => update({ hasParking: parseTriState(v) })}>
+                <SelectTrigger id="discovery-parking">
+                  <SelectValue>{triStateLabel}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {TRI_STATE_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2">
+              <Label htmlFor="discovery-description" className="mb-2 block">
+                Description recopiée (optionnel)
+              </Label>
+              <textarea
+                id="discovery-description"
+                className="flex min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
+                value={intake.descriptionRaw ?? ""}
+                onChange={(e) => update({ descriptionRaw: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+            </div>
+          </div>
+        </FormSection>
+
+        <FormSection title="Réseaux & accès" last>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label htmlFor="discovery-rebuildability" className="mb-2 block">
+                Droit de reconstruire tel qu&apos;affiché (ex. 再建築可)
+              </Label>
+              <Input
+                id="discovery-rebuildability"
+                value={intake.rebuildabilityRaw ?? ""}
+                onChange={(e) =>
+                  update({ rebuildabilityRaw: e.target.value.trim() === "" ? null : e.target.value })
+                }
+              />
+              <ParseHint raw={intake.rebuildabilityRaw} hint={rebuildabilityHint} />
+            </div>
+            <div>
+              <Label htmlFor="discovery-sewage" className="mb-2 block">
+                Assainissement tel qu&apos;affiché (ex. 浄化槽)
+              </Label>
+              <Input
+                id="discovery-sewage"
+                value={intake.sewageRaw ?? ""}
+                onChange={(e) => update({ sewageRaw: e.target.value.trim() === "" ? null : e.target.value })}
+              />
+              <ParseHint raw={intake.sewageRaw} hint={sewageHint} />
+            </div>
+          </div>
+        </FormSection>
+
+        <div className="mt-5">
           <Button
             onClick={addToPool}
             disabled={intake.source.trim() === "" || intake.sourceListingId.trim() === ""}
@@ -528,18 +553,23 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
         </div>
 
         {candidates.length > 0 && (
-          <div className="mt-6 border-t border-border pt-4">
-            <p className="mb-2 text-sm font-medium text-foreground">
+          <div className="mt-6 border-t border-border pt-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               {candidates.length} candidat{candidates.length > 1 ? "s" : ""} dans le pool
             </p>
-            <ul className="space-y-1 text-sm">
+            <ul className="space-y-2">
               {candidates.map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2">
-                  <span>
-                    {VERDICT_ICONS[verdictById.get(c.id) ?? "UNKNOWN"]}{" "}
+                <li
+                  key={c.id}
+                  className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
+                >
+                  <span className="text-foreground">
+                    <span aria-hidden>{VERDICT_ICONS[verdictById.get(c.id) ?? "UNKNOWN"]}</span>{" "}
                     {c.title ?? `${c.source} #${c.sourceListingId}`}
-                    {c.priceJpy !== null ? ` — ${formatJpy(c.priceJpy)}` : " — prix inconnu"}
-                    {` — ${LISTING_AVAILABILITY_LABELS[c.availabilityStatus]}`}
+                    <span className="text-muted-foreground">
+                      {c.priceJpy !== null ? ` — ${formatJpy(c.priceJpy)}` : " — prix inconnu"}
+                      {` — ${LISTING_AVAILABILITY_LABELS[c.availabilityStatus]}`}
+                    </span>
                   </span>
                   <span className="flex shrink-0 gap-1">
                     <Button variant="ghost" size="sm" onClick={() => editCandidate(c)}>
@@ -556,7 +586,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
         )}
 
         {candidates.length > 0 && (
-          <div className="mt-6 border-t border-border pt-4">
+          <div className="mt-6 border-t border-border pt-5">
             <p className="mb-3 text-sm text-muted-foreground">
               {discoveryResult.eligible.length} éligible{discoveryResult.eligible.length > 1 ? "s" : ""} ·{" "}
               {discoveryResult.needsReview.length} à vérifier ·{" "}
@@ -564,9 +594,24 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               {candidates.length} candidat{candidates.length > 1 ? "s" : ""}
             </p>
             <div className="grid gap-4 sm:grid-cols-3">
-              <DiscoveryResultColumn title="✅ Éligibles" items={discoveryResult.eligible} />
-              <DiscoveryResultColumn title="🟠 À vérifier (inconnu)" items={discoveryResult.needsReview} />
-              <DiscoveryResultColumn title="⛔ Exclus" items={discoveryResult.excluded} />
+              <DiscoveryResultColumn
+                title="Éligibles"
+                icon="✅"
+                tint="border-emerald-600/30 bg-emerald-600/5"
+                items={discoveryResult.eligible}
+              />
+              <DiscoveryResultColumn
+                title="À vérifier"
+                icon="🟠"
+                tint="border-amber-600/30 bg-amber-600/5"
+                items={discoveryResult.needsReview}
+              />
+              <DiscoveryResultColumn
+                title="Exclus"
+                icon="⛔"
+                tint="border-destructive/30 bg-destructive/5"
+                items={discoveryResult.excluded}
+              />
             </div>
           </div>
         )}
@@ -575,37 +620,66 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
   );
 }
 
-function DiscoveryResultColumn({ title, items }: { title: string; items: DiscoveryResultItem[] }) {
+function FormSection({
+  title,
+  last,
+  children,
+}: {
+  title: string;
+  last?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div>
-      <p className="mb-2 text-sm font-medium text-foreground">
-        {title} ({items.length})
+    <div className={`mt-5 ${last ? "" : "border-b border-border/60 pb-5"}`}>
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      {children}
+    </div>
+  );
+}
+
+function DiscoveryResultColumn({
+  title,
+  icon,
+  tint,
+  items,
+}: {
+  title: string;
+  icon: string;
+  tint: string;
+  items: DiscoveryResultItem[];
+}) {
+  return (
+    <Card className={`p-4 ${tint}`}>
+      <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {icon} {title} <span className="text-foreground">({items.length})</span>
       </p>
       {items.length === 0 ? (
         <p className="text-xs text-muted-foreground">Aucun bien.</p>
       ) : (
         <ul className="space-y-2 text-xs">
           {items.map((item) => (
-            <li key={item.listing.id} className="rounded border border-border p-2">
+            <li key={item.listing.id} className="rounded-md border border-border bg-card p-2.5">
               <p className="font-medium text-foreground">
                 {item.listing.title ?? `${item.listing.source} #${item.listing.sourceListingId}`}
               </p>
-              <p className="text-muted-foreground">
+              <p className="mt-0.5 text-muted-foreground">
                 Score préférences : {item.softPreferenceScore.score}/{item.softPreferenceScore.activeCriteriaCount}
               </p>
-              <ul className="mt-1 space-y-0.5">
-                {item.hardConstraintEvaluation.checks
-                  .filter((c) => c.status !== "NOT_APPLICABLE")
-                  .map((c) => (
-                    <li key={c.criterionId}>
-                      {c.label} : {c.status}
-                    </li>
-                  ))}
-              </ul>
+              {item.hardConstraintEvaluation.checks.filter((c) => c.status !== "NOT_APPLICABLE").length > 0 && (
+                <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
+                  {item.hardConstraintEvaluation.checks
+                    .filter((c) => c.status !== "NOT_APPLICABLE")
+                    .map((c) => (
+                      <li key={c.criterionId}>
+                        {c.label} : <span className="text-foreground">{c.status}</span>
+                      </li>
+                    ))}
+                </ul>
+              )}
             </li>
           ))}
         </ul>
       )}
-    </div>
+    </Card>
   );
 }

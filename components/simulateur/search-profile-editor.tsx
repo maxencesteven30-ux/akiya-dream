@@ -46,6 +46,10 @@ function triStateValue(value: boolean | null): string {
   return "unknown";
 }
 
+function triStateLabel(value: string): string {
+  return TRI_STATE_OPTIONS.find((o) => o.value === value)?.label ?? value;
+}
+
 function parseCommaList(raw: string): string[] {
   return raw
     .split(",")
@@ -165,7 +169,7 @@ export function SearchProfileEditor({
             onValueChange={(v) => updateHard({ requiresKnownRebuildability: parseTriState(v) })}
           >
             <SelectTrigger id="profile-requires-rebuildability">
-              <SelectValue />
+              <SelectValue>{triStateLabel}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {TRI_STATE_OPTIONS.map((o) => (
@@ -214,7 +218,7 @@ export function SearchProfileEditor({
             onValueChange={(v) => updateSoft({ wantsGarden: parseTriState(v) })}
           >
             <SelectTrigger id="profile-wants-garden">
-              <SelectValue />
+              <SelectValue>{triStateLabel}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {TRI_STATE_OPTIONS.map((o) => (
@@ -234,7 +238,7 @@ export function SearchProfileEditor({
             onValueChange={(v) => updateSoft({ ruralEnvironment: parseTriState(v) })}
           >
             <SelectTrigger id="profile-rural">
-              <SelectValue />
+              <SelectValue>{triStateLabel}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {TRI_STATE_OPTIONS.map((o) => (
@@ -254,7 +258,7 @@ export function SearchProfileEditor({
             onValueChange={(v) => updateSoft({ noCarRequired: parseTriState(v) })}
           >
             <SelectTrigger id="profile-no-car">
-              <SelectValue />
+              <SelectValue>{triStateLabel}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {TRI_STATE_OPTIONS.map((o) => (
@@ -274,7 +278,7 @@ export function SearchProfileEditor({
             onValueChange={(v) => updateSoft({ renovationAcceptable: parseTriState(v) })}
           >
             <SelectTrigger id="profile-renovation">
-              <SelectValue />
+              <SelectValue>{triStateLabel}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               {TRI_STATE_OPTIONS.map((o) => (
