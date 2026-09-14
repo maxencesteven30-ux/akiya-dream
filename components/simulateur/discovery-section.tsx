@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,7 +21,11 @@ import {
   createEmptyManualIntakeInput,
   type ManualIntakeInput,
 } from "@/lib/discovery/manual-intake";
-import { upsertCandidateListing, removeCandidateListing } from "@/lib/discovery/candidate-listings";
+import {
+  findCandidateListing,
+  removeCandidateListing,
+  upsertCandidateListing,
+} from "@/lib/discovery/candidate-listings";
 import { LISTING_AVAILABILITY_LABELS, type PropertyListing } from "@/lib/discovery/property-listing";
 import {
   runDiscoveryEngine,
@@ -114,6 +118,16 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
     }
   }, [profile]);
 
+  const derivedProfile = useMemo(
+    () => deriveSearchProfileFromProject(simulatorState),
+    [simulatorState],
+  );
+  const searchProfile = profile ?? derivedProfile;
+  const discoveryResult = useMemo(
+    () => runDiscoveryEngine(searchProfile, candidates),
+    [searchProfile, candidates],
+  );
+
   if (!open) {
     return (
       <div>
@@ -124,20 +138,25 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
     );
   }
 
-  const derivedProfile = deriveSearchProfileFromProject(simulatorState);
-  const searchProfile = profile ?? derivedProfile;
-  const discoveryResult = runDiscoveryEngine(searchProfile, candidates);
-
   const update = (patch: Partial<ManualIntakeInput>) => setIntake((prev) => ({ ...prev, ...patch }));
 
   const addToPool = () => {
     if (intake.source.trim() === "" || intake.sourceListingId.trim() === "") return;
+    const existing = findCandidateListing(candidates, intake.source, intake.sourceListingId);
     const listing = buildPropertyListingFromManualIntake(
-      `${intake.source}:${intake.sourceListingId}:${Date.now()}`,
+      existing?.id ?? `${intake.source}:${intake.sourceListingId}:${Date.now()}`,
       intake,
     );
     setCandidates((prev) => upsertCandidateListing(prev, listing));
     setIntake(createEmptyManualIntakeInput());
+  };
+
+  // Recharge la saisie brute d'un candidat déjà dans le pool pour la
+  // corriger — ré-ajouter remplace au même id (upsertCandidateListing),
+  // jamais un doublon.
+  const editCandidate = (candidate: PropertyListing) => {
+    const rawIntake = candidate.rawData as ManualIntakeInput | null;
+    if (rawIntake) setIntake(rawIntake);
   };
 
   return (
@@ -414,9 +433,14 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
                     {c.priceJpy !== null ? ` — ${formatJpy(c.priceJpy)}` : " — prix inconnu"}
                     {` — ${LISTING_AVAILABILITY_LABELS[c.availabilityStatus]}`}
                   </span>
-                  <Button variant="ghost" size="sm" onClick={() => setCandidates((prev) => removeCandidateListing(prev, c.id))}>
-                    Retirer
-                  </Button>
+                  <span className="flex shrink-0 gap-1">
+                    <Button variant="ghost" size="sm" onClick={() => editCandidate(c)}>
+                      Modifier
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setCandidates((prev) => removeCandidateListing(prev, c.id))}>
+                      Retirer
+                    </Button>
+                  </span>
                 </li>
               ))}
             </ul>
