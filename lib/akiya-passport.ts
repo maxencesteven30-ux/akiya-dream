@@ -2,6 +2,7 @@ import { REALITY_GATE_TEMPLATE } from "@/lib/reality-gate";
 import { buildNextActionSignals, type NextActionInput } from "@/lib/next-best-action";
 import { OPPORTUNITY_CATEGORY_LABELS, FEASIBILITY_LABELS, type OpportunityCategory } from "@/lib/opportunity";
 import type { FeasibilityLevel } from "@/lib/opportunity";
+import type { CrossSourceContext } from "@/lib/cross-source-context";
 
 // Phase Z — Akiya Passport.
 //
@@ -24,6 +25,10 @@ export interface AkiyaPassportInput {
     acquisitionJpy: number;
   };
   nextActionInput: NextActionInput;
+  // AD.3.5 — optionnel : présent seulement si une consultation MLIT a eu
+  // lieu dans la session (rafraîchissement manuel, comme FX/Market
+  // Context). Enrichit le Passport, ne le remplace jamais.
+  crossSourceContext?: CrossSourceContext | null;
 }
 
 export interface AkiyaPassportSummary {
@@ -62,6 +67,21 @@ export function computeAkiyaPassport(input: AkiyaPassportInput): AkiyaPassportSu
     .map((s) => s.reason.message);
 
   const nextMostImportantInfo = signals[0]?.message ?? "Projet prêt pour une offre.";
+
+  // AD.3.5 — jamais une recommandation catégorique : les données
+  // croisées enrichissent connu/estimé/inconnu comme le reste, ne créent
+  // jamais un blocage ni ne remplacent nextMostImportantInfo (qui reste
+  // piloté uniquement par Reality Gate/Due Diligence, cf. Next Best
+  // Action Engine).
+  if (input.crossSourceContext) {
+    const ctx = input.crossSourceContext;
+    if (ctx.transactionsAvailable) known.push("Transactions comparables MLIT disponibles (source externe datée)");
+    if (ctx.landPriceAvailable) known.push("Prix foncier officiel MLIT disponible (source externe datée)");
+    if (ctx.impliedLandValueJpy !== null) {
+      estimated.push(`Valeur foncière implicite (calculée) : ${ctx.impliedLandValueJpy.toLocaleString("fr-FR")} JPY`);
+    }
+    unknown.push(...ctx.unknowns);
+  }
 
   return {
     propertyName: input.propertyName,

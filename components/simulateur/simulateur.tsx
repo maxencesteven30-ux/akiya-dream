@@ -28,6 +28,7 @@ import { AskMyProjectSection } from "@/components/simulateur/ask-my-project-sect
 import { AkiyaPassportSection } from "@/components/simulateur/akiya-passport-section";
 import { FxIntelligenceSection } from "@/components/simulateur/fx-intelligence-section";
 import { MarketContextSection } from "@/components/simulateur/market-context-section";
+import type { CrossSourceContext } from "@/lib/cross-source-context";
 import type { FxRate } from "@/lib/fx";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
 import { RemoteOwnerSection } from "@/components/simulateur/remote-owner-section";
@@ -217,6 +218,10 @@ export function Simulateur() {
   // l'utilisateur (jamais automatique) : null tant qu'aucune consultation
   // n'a eu lieu dans cette session.
   const [fxRate, setFxRate] = useState<FxRate | null>(null);
+  // AD.3 — résultat du dernier croisement de sources (transactions +
+  // prix foncier officiel), calculé par MarketContextSection lors d'un
+  // rafraîchissement manuel, consommé par Akiya Passport.
+  const [crossSourceContext, setCrossSourceContext] = useState<CrossSourceContext | null>(null);
   const [eligibleSubsidies, setEligibleSubsidies] = useState<Subsidy[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -753,6 +758,7 @@ export function Simulateur() {
                       acquisitionJpy: historyOpportunityResult.budget.acquisitionFees.total,
                     },
                     nextActionInput: nextActionInputForQuestions,
+                    crossSourceContext,
                   }}
                 />
               </>
@@ -809,7 +815,11 @@ export function Simulateur() {
                   askingPriceJpy={state.housePriceJpy}
                   municipalityCode={state.realListing.municipalityCode}
                   surfaceM2={state.realListing.surfaceM2}
+                  landM2={state.realListing.landM2}
                   constructionYear={state.realListing.constructionYear}
+                  latitude={state.realListing.latitude}
+                  longitude={state.realListing.longitude}
+                  onCrossSourceContextComputed={setCrossSourceContext}
                 />
               </>
             )}

@@ -73,3 +73,33 @@ describe("computeAkiyaPassport", () => {
     expect(passport.unknown.some((u) => /incomplet/i.test(u))).toBe(true);
   });
 });
+
+describe("computeAkiyaPassport — AD.3.5 (cross-source, optionnel)", () => {
+  it("sans crossSourceContext, le Passport se comporte exactement comme avant (rétrocompatible)", () => {
+    const passport = computeAkiyaPassport(baseInput);
+    expect(passport.known.some((k) => /MLIT/i.test(k))).toBe(false);
+  });
+
+  it("enrichit connu/estimé/inconnu quand une consultation MLIT a eu lieu, sans toucher nextMostImportantInfo", () => {
+    const withoutCrossSource = computeAkiyaPassport(baseInput);
+    const passport = computeAkiyaPassport({
+      ...baseInput,
+      crossSourceContext: {
+        transactionsAvailable: true,
+        landPriceAvailable: true,
+        concordance: "SOURCES_CONCORDANT",
+        impliedLandValueJpy: 2_000_000,
+        medianLandPricePerSqmJpy: 10_000,
+        narrative: ["Contexte de marché disponible."],
+        unknowns: ["Prix foncier officiel : source indisponible."],
+      },
+    });
+    expect(passport.known.some((k) => /transactions comparables mlit/i.test(k))).toBe(true);
+    expect(passport.known.some((k) => /prix foncier officiel mlit/i.test(k))).toBe(true);
+    expect(passport.estimated.some((e) => /valeur foncière implicite/i.test(e))).toBe(true);
+    expect(passport.unknown).toContain("Prix foncier officiel : source indisponible.");
+    // Jamais une recommandation catégorique : la prochaine action reste
+    // pilotée uniquement par Reality Gate/Due Diligence.
+    expect(passport.nextMostImportantInfo).toBe(withoutCrossSource.nextMostImportantInfo);
+  });
+});

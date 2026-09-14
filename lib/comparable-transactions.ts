@@ -131,7 +131,9 @@ export interface MarketComparison {
 const HIGH_CONFIDENCE_MIN_COMPARABLES = 3;
 const MEDIUM_CONFIDENCE_MIN_COMPARABLES = 1;
 
-function computeMedian(values: number[]): number {
+// Exportée pour réutilisation (AD.3 — lib/cross-source-context.ts) :
+// une seule implémentation de la médiane dans tout le projet.
+export function computeMedian(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];

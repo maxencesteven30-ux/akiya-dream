@@ -1,4 +1,5 @@
 import { buildNextActionSignals, type NextActionInput, type PrioritizedAction } from "@/lib/next-best-action";
+import type { CrossSourceContext } from "@/lib/cross-source-context";
 
 // Phase AH — Evidence Graph / Decision Trace.
 //
@@ -47,6 +48,17 @@ const FIELD_PROVENANCE_RULES: Array<[prefix: string, label: ProvenanceLabel]> = 
   ["remoteOwner.", "USER_INPUT"],
   ["exitStrategy.", "USER_INPUT"],
   ["nextActionInput", "DERIVED_VALUE"],
+  // AD.3 — Cross-Source Intelligence : les données brutes MLIT sont des
+  // faits externes sourcés/datés ; tout ce qu'Akiya Dream en déduit
+  // (dispersion, médiane, valeur foncière implicite) reste une valeur
+  // calculée, jamais un fait externe.
+  ["mlitTransactions", "EXTERNAL_FACT"],
+  ["landPricePoints", "EXTERNAL_FACT"],
+  ["marketComparison", "DERIVED_VALUE"],
+  ["impliedLandValueJpy", "DERIVED_VALUE"],
+  ["medianLandPricePerSqmJpy", "DERIVED_VALUE"],
+  ["askingPriceJpy", "USER_INPUT"],
+  ["landM2", "USER_INPUT"],
 ];
 
 export function classifyFieldProvenance(fieldPath: string): ProvenanceLabel {
@@ -94,4 +106,32 @@ export function explainSignal(signal: PrioritizedAction): EvidenceNode {
 // premier.
 export function computeEvidenceGraph(input: NextActionInput): EvidenceNode[] {
   return buildNextActionSignals(input).map(explainSignal);
+}
+
+// AD.3.4 — trace le croisement des sources (transactions + prix foncier
+// officiel) selon la même structure VERDICT → REASON → FACTS →
+// PROVENANCE, sans dupliquer la logique de lib/cross-source-context.ts
+// ni celle de Next Best Action : un nœud distinct pour un domaine de
+// faits distinct (données de marché), jamais mélangé aux signaux
+// Reality Gate/Due Diligence.
+export function explainCrossSourceContext(context: CrossSourceContext): EvidenceNode {
+  const fieldsUsed = ["askingPriceJpy"];
+  if (context.transactionsAvailable) fieldsUsed.push("mlitTransactions", "marketComparison");
+  if (context.landPriceAvailable) {
+    fieldsUsed.push("landPricePoints", "medianLandPricePerSqmJpy");
+    if (context.impliedLandValueJpy !== null) {
+      fieldsUsed.push("landM2", "impliedLandValueJpy");
+    }
+  }
+
+  const facts = fieldsUsed.map((fieldPath) => ({ fieldPath, provenance: classifyFieldProvenance(fieldPath) }));
+
+  return {
+    verdict: context.concordance,
+    reasonMessage: context.narrative[0] ?? "Données insuffisantes pour croiser les sources.",
+    ruleId: "cross_source_concordance",
+    facts,
+    unknownFields: context.unknowns,
+    nextAction: context.narrative[context.narrative.length - 1] ?? "",
+  };
 }

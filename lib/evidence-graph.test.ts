@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { REALITY_GATE_TEMPLATE, RECONSTRUCTION_ITEM_ID } from "@/lib/reality-gate";
 import { createEmptyChecklist, computeCompletionSummary } from "@/lib/due-diligence";
 import type { NextActionInput } from "@/lib/next-best-action";
-import { classifyFieldProvenance, computeEvidenceGraph, explainSignal } from "@/lib/evidence-graph";
+import { classifyFieldProvenance, computeEvidenceGraph, explainCrossSourceContext, explainSignal } from "@/lib/evidence-graph";
+import type { CrossSourceContext } from "@/lib/cross-source-context";
 import type { RealityGateState } from "@/lib/types";
 
 function cleanRealityGate(): RealityGateState {
@@ -81,5 +82,53 @@ describe("computeEvidenceGraph", () => {
 
   it("tableau vide quand le projet est prêt — aucun nœud à expliquer, jamais un faux positif", () => {
     expect(computeEvidenceGraph(readyInput)).toEqual([]);
+  });
+});
+
+describe("classifyFieldProvenance — AD.3 (cross-source)", () => {
+  it("les données MLIT brutes sont EXTERNAL_FACT, jamais DERIVED_VALUE", () => {
+    expect(classifyFieldProvenance("mlitTransactions")).toBe("EXTERNAL_FACT");
+    expect(classifyFieldProvenance("landPricePoints")).toBe("EXTERNAL_FACT");
+  });
+
+  it("tout ce qu'Akiya Dream calcule à partir de MLIT est DERIVED_VALUE, jamais EXTERNAL_FACT", () => {
+    expect(classifyFieldProvenance("marketComparison")).toBe("DERIVED_VALUE");
+    expect(classifyFieldProvenance("impliedLandValueJpy")).toBe("DERIVED_VALUE");
+    expect(classifyFieldProvenance("medianLandPricePerSqmJpy")).toBe("DERIVED_VALUE");
+  });
+
+  it("le prix demandé est USER_INPUT", () => {
+    expect(classifyFieldProvenance("askingPriceJpy")).toBe("USER_INPUT");
+  });
+});
+
+describe("explainCrossSourceContext", () => {
+  const context: CrossSourceContext = {
+    transactionsAvailable: true,
+    landPriceAvailable: true,
+    concordance: "SOURCES_CONCORDANT",
+    impliedLandValueJpy: 2_000_000,
+    medianLandPricePerSqmJpy: 10_000,
+    narrative: ["Contexte de marché disponible.", "Prochaine action possible."],
+    unknowns: [],
+  };
+
+  it("expose le verdict de concordance et une trace complète des champs utilisés", () => {
+    const node = explainCrossSourceContext(context);
+    expect(node.verdict).toBe("SOURCES_CONCORDANT");
+    expect(node.ruleId).toBe("cross_source_concordance");
+    expect(node.facts.map((f) => f.fieldPath)).toEqual(
+      expect.arrayContaining(["mlitTransactions", "marketComparison", "landPricePoints", "impliedLandValueJpy"]),
+    );
+  });
+
+  it("chaque fait a une provenance classée, jamais UNKNOWN pour un champ reconnu", () => {
+    const node = explainCrossSourceContext(context);
+    expect(node.facts.every((f) => f.provenance !== "UNKNOWN")).toBe(true);
+  });
+
+  it("n'inclut pas les champs fonciers quand landPriceAvailable est faux", () => {
+    const node = explainCrossSourceContext({ ...context, landPriceAvailable: false });
+    expect(node.facts.map((f) => f.fieldPath)).not.toContain("landPricePoints");
   });
 });

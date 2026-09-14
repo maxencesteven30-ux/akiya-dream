@@ -6,35 +6,52 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { computeMarketContext, MARKET_CONTEXT_LABELS, type MarketContext } from "@/lib/market-context";
 import { PRICE_ANOMALY_DISCLAIMER } from "@/lib/price-anomaly";
+import { computeCrossSourceContext, type CrossSourceContext } from "@/lib/cross-source-context";
 import type { RealityDataResult } from "@/lib/reality-data";
 import type { MlitTransaction } from "@/lib/mlit/types";
+import type { OfficialLandPricePoint } from "@/lib/mlit/land-price-types";
 
-// Phase AK — Market Context.
+// Phase AK — Market Context, étendu en AD.3 (Cross-Source Intelligence).
 //
 // Rafraîchissement strictement manuel (même discipline que FX
 // Intelligence, Phase AF) : jamais d'appel automatique au montage ni à
-// chaque saisie. L'utilisateur déclenche la requête, qui passe par notre
-// propre Route Handler (jamais un appel MLIT direct depuis le
+// chaque saisie. L'utilisateur déclenche la requête, qui passe par nos
+// propres Route Handlers (jamais un appel MLIT direct depuis le
 // navigateur — interdit par la source elle-même).
 
 interface MarketContextSectionProps {
   askingPriceJpy: number;
   municipalityCode: string | null;
   surfaceM2: number | null;
+  landM2: number | null;
   constructionYear: number | null;
+  latitude: number | null;
+  longitude: number | null;
+  onCrossSourceContextComputed?: (context: CrossSourceContext) => void;
 }
 
 function currentQuarter(date: Date): 1 | 2 | 3 | 4 {
   return (Math.floor(date.getMonth() / 3) + 1) as 1 | 2 | 3 | 4;
 }
 
+const CONCORDANCE_LABELS: Record<CrossSourceContext["concordance"], string> = {
+  SOURCES_CONCORDANT: "🟢 Sources concordantes",
+  SOURCES_NOT_DIRECTLY_COMPARABLE: "🟠 Sources non directement comparables",
+  INSUFFICIENT_DATA: "🟠 Données insuffisantes pour un croisement",
+};
+
 export function MarketContextSection({
   askingPriceJpy,
   municipalityCode,
   surfaceM2,
+  landM2,
   constructionYear,
+  latitude,
+  longitude,
+  onCrossSourceContextComputed,
 }: MarketContextSectionProps) {
   const [context, setContext] = useState<MarketContext | null>(null);
+  const [crossSource, setCrossSource] = useState<CrossSourceContext | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchError, setFetchError] = useState(false);
 
@@ -44,16 +61,45 @@ export function MarketContextSection({
     setFetchError(false);
     try {
       const now = new Date();
-      const params = new URLSearchParams({
+      const transactionsParams = new URLSearchParams({
         municipalityCode,
         year: String(now.getFullYear() - 1),
         quarter: String(currentQuarter(now)),
       });
-      const response = await fetch(`/api/mlit/transactions?${params}`);
-      const result: RealityDataResult<MlitTransaction[]> = await response.json();
-      setContext(
-        computeMarketContext(askingPriceJpy, result.status, { municipalityCode, surfaceM2, constructionYear }, result.data ?? []),
+      const transactionsResponse = await fetch(`/api/mlit/transactions?${transactionsParams}`);
+      const transactionsResult: RealityDataResult<MlitTransaction[]> = await transactionsResponse.json();
+      const marketContext = computeMarketContext(
+        askingPriceJpy,
+        transactionsResult.status,
+        { municipalityCode, surfaceM2, constructionYear },
+        transactionsResult.data ?? [],
       );
+      setContext(marketContext);
+
+      let landPriceResult: RealityDataResult<OfficialLandPricePoint[]> = {
+        status: "INSUFFICIENT_LOCATION",
+        metadata: { sourceName: "MLIT", fetchedAt: new Date().toISOString(), geographicPrecision: "INSUFFICIENT" },
+      };
+      if (latitude !== null && longitude !== null) {
+        const landPriceParams = new URLSearchParams({
+          latitude: String(latitude),
+          longitude: String(longitude),
+          year: String(now.getFullYear()),
+        });
+        const landPriceResponse = await fetch(`/api/mlit/land-price?${landPriceParams}`);
+        landPriceResult = await landPriceResponse.json();
+      }
+
+      const crossSourceContext = computeCrossSourceContext({
+        askingPriceJpy,
+        landM2,
+        transactionsStatus: transactionsResult.status,
+        marketComparison: marketContext.comparison,
+        landPriceStatus: landPriceResult.status,
+        landPricePoints: landPriceResult.data ?? [],
+      });
+      setCrossSource(crossSourceContext);
+      onCrossSourceContextComputed?.(crossSourceContext);
     } catch {
       setFetchError(true);
     } finally {
@@ -73,8 +119,8 @@ export function MarketContextSection({
         </h2>
       </div>
       <p className="mb-4 text-sm text-muted-foreground">
-        Comment le prix demandé se situe par rapport à de vraies transactions MLIT — jamais la valeur du
-        bien.
+        Comment le prix demandé se situe par rapport à de vraies transactions et prix fonciers MLIT —
+        jamais la valeur du bien.
       </p>
 
       <Card className="border-border p-6">
@@ -115,6 +161,13 @@ export function MarketContextSection({
                 Fourchette des comparables :{" "}
                 {context.comparison.priceDispersionJpy.minJpy.toLocaleString("fr-FR")} –{" "}
                 {context.comparison.priceDispersionJpy.maxJpy.toLocaleString("fr-FR")} JPY
+                {context.comparison.medianPriceJpy !== null &&
+                  ` (médiane ${context.comparison.medianPriceJpy.toLocaleString("fr-FR")} JPY)`}
+              </p>
+            )}
+            {context.comparison.oldestPeriod && context.comparison.newestPeriod && (
+              <p className="mt-1">
+                Période couverte : {context.comparison.oldestPeriod} → {context.comparison.newestPeriod}
               </p>
             )}
             {context.comparison.limits.map((limit) => (
@@ -123,6 +176,36 @@ export function MarketContextSection({
               </p>
             ))}
             <p className="mt-2">{PRICE_ANOMALY_DISCLAIMER}</p>
+          </div>
+        )}
+
+        {crossSource && (
+          <div className="mt-4 border-t border-border pt-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              🧭 Croisement des sources
+            </p>
+            <p className="mt-1 text-sm font-medium text-foreground">
+              {CONCORDANCE_LABELS[crossSource.concordance]}
+            </p>
+            {crossSource.impliedLandValueJpy !== null && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Valeur foncière implicite (calculée) : {crossSource.impliedLandValueJpy.toLocaleString("fr-FR")} JPY
+                {" "}
+                (médiane {crossSource.medianLandPricePerSqmJpy?.toLocaleString("fr-FR")} JPY/m² × surface du
+                terrain)
+              </p>
+            )}
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              {crossSource.narrative.map((sentence) => (
+                <p key={sentence}>{sentence}</p>
+              ))}
+            </div>
+            {!latitude || !longitude ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Renseignez les coordonnées GPS du bien pour inclure le prix foncier officiel dans ce
+                croisement.
+              </p>
+            ) : null}
           </div>
         )}
       </Card>
