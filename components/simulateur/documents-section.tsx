@@ -199,13 +199,19 @@ export function DocumentsSection({ projectId, onDocumentsChange }: DocumentsSect
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
-                  <Button size="sm" variant="outline" onClick={() => handleView(doc)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Voir ${doc.fileName}`}
+                    onClick={() => handleView(doc)}
+                  >
                     Voir
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     className="text-muted-foreground"
+                    aria-label={`Supprimer ${doc.fileName}`}
                     onClick={() => handleDelete(doc)}
                   >
                     Supprimer

@@ -141,6 +141,7 @@ export function HistorySection({
                       size="sm"
                       variant="ghost"
                       className="h-auto p-0 text-xs text-muted-foreground"
+                      aria-label={`Supprimer le point d'étape du ${DATE_FORMATTER.format(new Date(entry.timestamp))}`}
                       onClick={() => onDelete(entry.id)}
                     >
                       Supprimer

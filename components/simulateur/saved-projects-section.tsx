@@ -187,12 +187,20 @@ export function SavedProjectsSection({ currentProject, onLoad, onSaved }: SavedP
                   </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap justify-end gap-2">
-                  <Button size="sm" variant="outline" onClick={() => onLoad(project)}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    aria-label={`Charger ${project.name}`}
+                    onClick={() => onLoad(project)}
+                  >
                     Charger
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
+                    aria-label={
+                      project.shareToken ? `Copier le lien de ${project.name}` : `Partager ${project.name}`
+                    }
                     onClick={() => handleShare(project)}
                     disabled={sharingId === project.id}
                   >
@@ -209,6 +217,7 @@ export function SavedProjectsSection({ currentProject, onLoad, onSaved }: SavedP
                       size="sm"
                       variant="ghost"
                       className="text-muted-foreground"
+                      aria-label={`Arrêter le partage de ${project.name}`}
                       onClick={() => handleUnshare(project)}
                     >
                       Arrêter le partage
@@ -218,6 +227,7 @@ export function SavedProjectsSection({ currentProject, onLoad, onSaved }: SavedP
                     size="sm"
                     variant="ghost"
                     className="text-muted-foreground"
+                    aria-label={`Supprimer ${project.name}`}
                     onClick={() => handleDelete(project.id)}
                   >
                     Supprimer
