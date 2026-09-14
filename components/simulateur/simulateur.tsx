@@ -17,6 +17,7 @@ import { ComparateurSection } from "@/components/simulateur/comparateur-section"
 import { RegionFinder } from "@/components/simulateur/region-finder";
 import { JapanMap } from "@/components/simulateur/japan-map";
 import { RealListingSection } from "@/components/simulateur/real-listing-section";
+import { DiscoverySection } from "@/components/simulateur/discovery-section";
 import { HiddenCostsSection } from "@/components/simulateur/hidden-costs-section";
 import { DueDiligenceSection } from "@/components/simulateur/due-diligence-section";
 import { VisitChecklistSection } from "@/components/simulateur/visit-checklist-section";
@@ -661,6 +662,7 @@ export function Simulateur() {
               needsTranslation={state.needsTranslation}
               onNeedsTranslationChange={setNeedsTranslation}
             />
+            <DiscoverySection simulatorState={state} />
             <RealListingSection
               realListing={state.realListing}
               onChange={setRealListing}
