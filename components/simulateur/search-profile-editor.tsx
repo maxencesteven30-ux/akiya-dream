@@ -3,13 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { TriStateSelect } from "@/components/simulateur/tri-state-select";
 import { formatJpy } from "@/lib/format";
 import type { HardConstraints, SearchProfile, SoftPreferences } from "@/lib/discovery/search-profile";
 
@@ -28,27 +22,7 @@ import type { HardConstraints, SearchProfile, SoftPreferences } from "@/lib/disc
 // noCarRequired, renovationAcceptable) portent une légende qui le dit
 // clairement, pour ne jamais laisser croire qu'ils filtrent réellement.
 
-const TRI_STATE_OPTIONS: { value: string; label: string }[] = [
-  { value: "unknown", label: "Non décidé" },
-  { value: "true", label: "Oui" },
-  { value: "false", label: "Non" },
-];
-
-function parseTriState(raw: string | null): boolean | null {
-  if (raw === "true") return true;
-  if (raw === "false") return false;
-  return null;
-}
-
-function triStateValue(value: boolean | null): string {
-  if (value === true) return "true";
-  if (value === false) return "false";
-  return "unknown";
-}
-
-function triStateLabel(value: string): string {
-  return TRI_STATE_OPTIONS.find((o) => o.value === value)?.label ?? value;
-}
+const UNKNOWN_LABEL = "Non décidé";
 
 function parseCommaList(raw: string): string[] {
   return raw
@@ -164,21 +138,12 @@ export function SearchProfileEditor({
           <Label htmlFor="profile-requires-rebuildability" className="mb-2 block">
             Exiger un droit de reconstruire déjà confirmé
           </Label>
-          <Select
-            value={triStateValue(profile.hardConstraints.requiresKnownRebuildability)}
-            onValueChange={(v) => updateHard({ requiresKnownRebuildability: parseTriState(v) })}
-          >
-            <SelectTrigger id="profile-requires-rebuildability">
-              <SelectValue>{triStateLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {TRI_STATE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TriStateSelect
+            id="profile-requires-rebuildability"
+            value={profile.hardConstraints.requiresKnownRebuildability}
+            onChange={(v) => updateHard({ requiresKnownRebuildability: v })}
+            unknownLabel={UNKNOWN_LABEL}
+          />
         </div>
       </div>
 
@@ -213,81 +178,45 @@ export function SearchProfileEditor({
           <Label htmlFor="profile-wants-garden" className="mb-2 block">
             Jardin souhaité
           </Label>
-          <Select
-            value={triStateValue(profile.softPreferences.wantsGarden)}
-            onValueChange={(v) => updateSoft({ wantsGarden: parseTriState(v) })}
-          >
-            <SelectTrigger id="profile-wants-garden">
-              <SelectValue>{triStateLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {TRI_STATE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TriStateSelect
+            id="profile-wants-garden"
+            value={profile.softPreferences.wantsGarden}
+            onChange={(v) => updateSoft({ wantsGarden: v })}
+            unknownLabel={UNKNOWN_LABEL}
+          />
         </div>
         <div>
           <Label htmlFor="profile-rural" className="mb-2 block">
             Environnement rural souhaité
           </Label>
-          <Select
-            value={triStateValue(profile.softPreferences.ruralEnvironment)}
-            onValueChange={(v) => updateSoft({ ruralEnvironment: parseTriState(v) })}
-          >
-            <SelectTrigger id="profile-rural">
-              <SelectValue>{triStateLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {TRI_STATE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TriStateSelect
+            id="profile-rural"
+            value={profile.softPreferences.ruralEnvironment}
+            onChange={(v) => updateSoft({ ruralEnvironment: v })}
+            unknownLabel={UNKNOWN_LABEL}
+          />
         </div>
         <div>
           <Label htmlFor="profile-no-car" className="mb-2 block">
             Absence de voiture souhaitée
           </Label>
-          <Select
-            value={triStateValue(profile.softPreferences.noCarRequired)}
-            onValueChange={(v) => updateSoft({ noCarRequired: parseTriState(v) })}
-          >
-            <SelectTrigger id="profile-no-car">
-              <SelectValue>{triStateLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {TRI_STATE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TriStateSelect
+            id="profile-no-car"
+            value={profile.softPreferences.noCarRequired}
+            onChange={(v) => updateSoft({ noCarRequired: v })}
+            unknownLabel={UNKNOWN_LABEL}
+          />
         </div>
         <div>
           <Label htmlFor="profile-renovation" className="mb-2 block">
             Tolérance à la rénovation
           </Label>
-          <Select
-            value={triStateValue(profile.softPreferences.renovationAcceptable)}
-            onValueChange={(v) => updateSoft({ renovationAcceptable: parseTriState(v) })}
-          >
-            <SelectTrigger id="profile-renovation">
-              <SelectValue>{triStateLabel}</SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {TRI_STATE_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <TriStateSelect
+            id="profile-renovation"
+            value={profile.softPreferences.renovationAcceptable}
+            onChange={(v) => updateSoft({ renovationAcceptable: v })}
+            unknownLabel={UNKNOWN_LABEL}
+          />
         </div>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">

@@ -42,6 +42,7 @@ import {
   type DiscoveryResultItem,
 } from "@/lib/discovery/discovery-orchestrator";
 import { SearchProfileEditor } from "@/components/simulateur/search-profile-editor";
+import { TriStateSelect } from "@/components/simulateur/tri-state-select";
 
 // Era 9 / Phase AN — Discovery UI.
 //
@@ -62,12 +63,6 @@ import { SearchProfileEditor } from "@/components/simulateur/search-profile-edit
 const CANDIDATES_STORAGE_KEY = "akiya-discovery-candidates";
 const PROFILE_STORAGE_KEY = "akiya-discovery-profile";
 
-const TRI_STATE_OPTIONS: { value: string; label: string }[] = [
-  { value: "unknown", label: "Non renseigné" },
-  { value: "true", label: "Oui" },
-  { value: "false", label: "Non" },
-];
-
 const AVAILABILITY_OPTIONS = Object.entries(LISTING_AVAILABILITY_LABELS).map(([value, label]) => ({
   value,
   label,
@@ -78,22 +73,6 @@ const VERDICT_ICONS: Record<"PASS" | "FAIL" | "UNKNOWN", string> = {
   FAIL: "⛔",
   UNKNOWN: "🟠",
 };
-
-function parseTriState(raw: string | null): boolean | null {
-  if (raw === "true") return true;
-  if (raw === "false") return false;
-  return null;
-}
-
-function triStateValue(value: boolean | null): string {
-  if (value === true) return "true";
-  if (value === false) return "false";
-  return "unknown";
-}
-
-function triStateLabel(value: string): string {
-  return TRI_STATE_OPTIONS.find((o) => o.value === value)?.label ?? value;
-}
 
 const REBUILDABILITY_HINT_LABELS: Partial<Record<RealityGateItemStatus, string>> = {
   verifie: "droit de reconstruire confirmé",
@@ -470,35 +449,21 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               <Label htmlFor="discovery-garden" className="mb-2 block">
                 Jardin
               </Label>
-              <Select value={triStateValue(intake.hasGarden)} onValueChange={(v) => update({ hasGarden: parseTriState(v) })}>
-                <SelectTrigger id="discovery-garden">
-                  <SelectValue>{triStateLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {TRI_STATE_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <TriStateSelect
+                id="discovery-garden"
+                value={intake.hasGarden}
+                onChange={(v) => update({ hasGarden: v })}
+              />
             </div>
             <div>
               <Label htmlFor="discovery-parking" className="mb-2 block">
                 Parking
               </Label>
-              <Select value={triStateValue(intake.hasParking)} onValueChange={(v) => update({ hasParking: parseTriState(v) })}>
-                <SelectTrigger id="discovery-parking">
-                  <SelectValue>{triStateLabel}</SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {TRI_STATE_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <TriStateSelect
+                id="discovery-parking"
+                value={intake.hasParking}
+                onChange={(v) => update({ hasParking: v })}
+              />
             </div>
             <div className="sm:col-span-2">
               <Label htmlFor="discovery-description" className="mb-2 block">
