@@ -72,6 +72,11 @@ export interface RealListing {
   // (cf. lib/geo-precision.ts) — jamais déduites de la ville seule.
   latitude: number | null;
   longitude: number | null;
+  // Code municipal MLIT à 5 chiffres (総務省), Phase AK — Market Context.
+  // Aucune correspondance automatique n'existe entre la ville en texte
+  // libre et ce code officiel : l'utilisateur doit le renseigner
+  // lui-même (ex. via le site du MLIT). Jamais deviné depuis `city`.
+  municipalityCode: string | null;
   surfaceM2: number | null;
   landM2: number | null;
   constructionYear: number | null;

@@ -35,6 +35,7 @@ const EMPTY_LISTING: RealListing = {
   city: "Test",
   latitude: null,
   longitude: null,
+  municipalityCode: null,
   surfaceM2: null,
   landM2: null,
   constructionYear: null,

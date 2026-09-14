@@ -27,6 +27,7 @@ import { computeVisitStatusFromState } from "@/lib/decision-center";
 import { AskMyProjectSection } from "@/components/simulateur/ask-my-project-section";
 import { AkiyaPassportSection } from "@/components/simulateur/akiya-passport-section";
 import { FxIntelligenceSection } from "@/components/simulateur/fx-intelligence-section";
+import { MarketContextSection } from "@/components/simulateur/market-context-section";
 import type { FxRate } from "@/lib/fx";
 import { RealityGateSection } from "@/components/simulateur/reality-gate-section";
 import { RemoteOwnerSection } from "@/components/simulateur/remote-owner-section";
@@ -800,6 +801,18 @@ export function Simulateur() {
 
             <Separator />
             <FxIntelligenceSection onRateFetched={setFxRate} />
+
+            {state.realListing && (
+              <>
+                <Separator />
+                <MarketContextSection
+                  askingPriceJpy={state.housePriceJpy}
+                  municipalityCode={state.realListing.municipalityCode}
+                  surfaceM2={state.realListing.surfaceM2}
+                  constructionYear={state.realListing.constructionYear}
+                />
+              </>
+            )}
 
             {state.realListing && historyOpportunityResult && (
               <>

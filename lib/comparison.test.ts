@@ -16,6 +16,7 @@ const GOOD_LISTING: RealListing = {
   city: "Test",
   latitude: null,
   longitude: null,
+  municipalityCode: null,
   surfaceM2: 80,
   landM2: null,
   constructionYear: 2015,

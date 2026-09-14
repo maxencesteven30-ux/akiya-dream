@@ -39,6 +39,7 @@ const EMPTY_LISTING: RealListing = {
   city: "",
   latitude: null,
   longitude: null,
+  municipalityCode: null,
   surfaceM2: null,
   landM2: null,
   constructionYear: null,
@@ -60,6 +61,11 @@ function parseLatitude(raw: string): number | null {
 function parseLongitude(raw: string): number | null {
   const value = parseNumber(raw);
   return value !== null && isValidLongitude(value) ? value : null;
+}
+
+function parseMunicipalityCode(raw: string): string | null {
+  const trimmed = raw.trim();
+  return /^\d{5}$/.test(trimmed) ? trimmed : null;
 }
 
 export function RealListingSection({
@@ -173,6 +179,21 @@ export function RealListingSection({
               value={listing.longitude ?? ""}
               onChange={(e) => update({ longitude: parseLongitude(e.target.value) })}
             />
+          </div>
+          <div>
+            <Label htmlFor="listing-municipality-code" className="mb-2 block">
+              Code municipal MLIT (optionnel)
+            </Label>
+            <Input
+              id="listing-municipality-code"
+              placeholder="ex. 20201"
+              value={listing.municipalityCode ?? ""}
+              onChange={(e) => update({ municipalityCode: parseMunicipalityCode(e.target.value) })}
+            />
+            <p className="mt-1 text-xs text-muted-foreground">
+              5 chiffres — jamais déduit de la ville, à chercher sur le site du MLIT. Nécessaire pour le
+              contexte de marché.
+            </p>
           </div>
           <div>
             <Label htmlFor="listing-surface" className="mb-2 block">
