@@ -1,4 +1,5 @@
 import { latLonToTile } from "@/lib/mlit/tile-math";
+import { fetchMlitEndpoint } from "@/lib/mlit/fetch-mlit";
 import { pointInMultiPolygon, pointInPolygon, type PolygonCoordinates } from "@/lib/hazard/point-in-polygon";
 import type { HazardCategory, HazardCheckResult } from "@/lib/hazard-contract";
 
@@ -34,8 +35,6 @@ const HAZARD_ENDPOINT_CODES: Record<PolygonHazardCategory, string> = {
 // z14 : même compromis documenté que pour XPT002 (lib/mlit/tile-math.ts)
 // — dans la plage autorisée par chacun de ces 4 endpoints (11/14-15).
 const HAZARD_ZOOM = 14;
-const REQUEST_TIMEOUT_MS = 10_000;
-const AUTH_FAILURE_STATUSES = [401, 403];
 const HAZARD_SOURCE_URL = "https://www.reinfolib.mlit.go.jp/";
 
 function hazardSourceName(category: PolygonHazardCategory): string {
@@ -111,35 +110,15 @@ export async function fetchHazardZone(
   url.searchParams.set("x", String(tile.x));
   url.searchParams.set("y", String(tile.y));
 
-  const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    response = await fetchImpl(url.toString(), {
-      headers: { "Ocp-Apim-Subscription-Key": apiKey },
-      signal: timeoutController.signal,
-    });
-  } catch {
+  const outcome = await fetchMlitEndpoint(url.toString(), apiKey, fetchImpl);
+  if (outcome.kind === "network_error" || outcome.kind === "http_error") {
     return { category, status: "ERROR", metadata: baseMetadata };
-  } finally {
-    clearTimeout(timeoutId);
   }
-
-  if (AUTH_FAILURE_STATUSES.includes(response.status)) {
+  if (outcome.kind === "auth_failure") {
     return { category, status: "DATA_UNAVAILABLE", metadata: baseMetadata };
   }
-  if (!response.ok) {
-    return { category, status: "ERROR", metadata: baseMetadata };
-  }
 
-  let json: unknown;
-  try {
-    json = await response.json();
-  } catch {
-    return { category, status: "ERROR", metadata: baseMetadata };
-  }
-
+  const json = outcome.json;
   if (!isHazardGeoJsonResponse(json)) {
     return { category, status: "ERROR", metadata: baseMetadata };
   }

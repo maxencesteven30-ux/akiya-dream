@@ -1,4 +1,5 @@
 import { latLonToTile } from "@/lib/mlit/tile-math";
+import { fetchMlitEndpoint } from "@/lib/mlit/fetch-mlit";
 import { haversineDistanceMeters } from "@/lib/amenities/distance";
 
 // Era 9 (suite) — provider "services essentiels à proximité" (国土数値
@@ -61,8 +62,6 @@ const FIELD_MAP: Record<AmenityCategory, { name: string; type: string }> = {
 };
 
 const AMENITY_ZOOM = 14;
-const REQUEST_TIMEOUT_MS = 10_000;
-const AUTH_FAILURE_STATUSES = [401, 403];
 const AMENITY_SOURCE_URL = "https://www.reinfolib.mlit.go.jp/";
 
 export type AmenitySearchStatus =
@@ -156,35 +155,15 @@ export async function fetchNearestAmenities(
   url.searchParams.set("x", String(tile.x));
   url.searchParams.set("y", String(tile.y));
 
-  const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    response = await fetchImpl(url.toString(), {
-      headers: { "Ocp-Apim-Subscription-Key": apiKey },
-      signal: timeoutController.signal,
-    });
-  } catch {
+  const outcome = await fetchMlitEndpoint(url.toString(), apiKey, fetchImpl);
+  if (outcome.kind === "network_error" || outcome.kind === "http_error") {
     return { category, status: "ERROR", amenities: [], metadata };
-  } finally {
-    clearTimeout(timeoutId);
   }
-
-  if (AUTH_FAILURE_STATUSES.includes(response.status)) {
+  if (outcome.kind === "auth_failure") {
     return { category, status: "DATA_UNAVAILABLE", amenities: [], metadata };
   }
-  if (!response.ok) {
-    return { category, status: "ERROR", amenities: [], metadata };
-  }
 
-  let json: unknown;
-  try {
-    json = await response.json();
-  } catch {
-    return { category, status: "ERROR", amenities: [], metadata };
-  }
-
+  const json = outcome.json;
   if (!isAmenityGeoJsonResponse(json)) {
     return { category, status: "ERROR", amenities: [], metadata };
   }

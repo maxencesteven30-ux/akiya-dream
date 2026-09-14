@@ -1,6 +1,7 @@
 import { makeRealityDataResult, insufficientLocationResult, unavailableResult, errorResult } from "@/lib/reality-data";
 import type { RealityDataResult } from "@/lib/reality-data";
 import { latLonToTile } from "@/lib/mlit/tile-math";
+import { fetchMlitEndpoint } from "@/lib/mlit/fetch-mlit";
 import { pointInMultiPolygon, pointInPolygon, type PolygonCoordinates } from "@/lib/hazard/point-in-polygon";
 import { parsePopulationMeshFeature, type PopulationYearPoint } from "@/lib/demographics/population-mesh";
 
@@ -21,8 +22,6 @@ const POPULATION_ENDPOINT = "https://www.reinfolib.mlit.go.jp/ex-api/external/XK
 // z14 : dans la plage documentée (11-15), même compromis que pour le
 // moteur de risques et XPT002.
 const POPULATION_ZOOM = 14;
-const REQUEST_TIMEOUT_MS = 10_000;
-const AUTH_FAILURE_STATUSES = [401, 403];
 
 export interface FetchPopulationProjectionParams {
   latitude: number | null;
@@ -77,35 +76,15 @@ export async function fetchPopulationProjection(
   url.searchParams.set("x", String(tile.x));
   url.searchParams.set("y", String(tile.y));
 
-  const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    response = await fetchImpl(url.toString(), {
-      headers: { "Ocp-Apim-Subscription-Key": apiKey },
-      signal: timeoutController.signal,
-    });
-  } catch {
+  const outcome = await fetchMlitEndpoint(url.toString(), apiKey, fetchImpl);
+  if (outcome.kind === "network_error" || outcome.kind === "http_error") {
     return errorResult(POPULATION_SOURCE_NAME);
-  } finally {
-    clearTimeout(timeoutId);
   }
-
-  if (AUTH_FAILURE_STATUSES.includes(response.status)) {
+  if (outcome.kind === "auth_failure") {
     return unavailableResult(POPULATION_SOURCE_NAME);
   }
-  if (!response.ok) {
-    return errorResult(POPULATION_SOURCE_NAME);
-  }
 
-  let json: unknown;
-  try {
-    json = await response.json();
-  } catch {
-    return errorResult(POPULATION_SOURCE_NAME);
-  }
-
+  const json = outcome.json;
   if (!isPopulationGeoJsonResponse(json)) {
     return errorResult(POPULATION_SOURCE_NAME);
   }

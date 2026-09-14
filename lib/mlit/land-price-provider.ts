@@ -1,6 +1,7 @@
 import { makeRealityDataResult, insufficientLocationResult, unavailableResult, errorResult } from "@/lib/reality-data";
 import type { RealityDataResult } from "@/lib/reality-data";
 import { latLonToTile, DEFAULT_LAND_PRICE_ZOOM } from "@/lib/mlit/tile-math";
+import { fetchMlitEndpoint } from "@/lib/mlit/fetch-mlit";
 import { parseLandPriceFeature, type LandPriceGeoJsonResponse, type OfficialLandPricePoint } from "@/lib/mlit/land-price-types";
 
 // AD.2 — provider 地価公示・地価調査 (XPT002). Même discipline que le
@@ -15,8 +16,6 @@ import { parseLandPriceFeature, type LandPriceGeoJsonResponse, type OfficialLand
 const LAND_PRICE_SOURCE_NAME = "MLIT — 不動産情報ライブラリ (地価公示・地価調査 XPT002)";
 const LAND_PRICE_SOURCE_URL = "https://www.reinfolib.mlit.go.jp/";
 const LAND_PRICE_ENDPOINT = "https://www.reinfolib.mlit.go.jp/ex-api/external/XPT002";
-const REQUEST_TIMEOUT_MS = 10_000;
-const AUTH_FAILURE_STATUSES = [401, 403];
 
 export interface FetchOfficialLandPriceParams {
   latitude: number | null;
@@ -64,35 +63,15 @@ export async function fetchOfficialLandPrice(
   url.searchParams.set("y", String(tile.y));
   url.searchParams.set("year", String(params.year));
 
-  const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
-
-  let response: Response;
-  try {
-    response = await fetchImpl(url.toString(), {
-      headers: { "Ocp-Apim-Subscription-Key": apiKey },
-      signal: timeoutController.signal,
-    });
-  } catch {
+  const outcome = await fetchMlitEndpoint(url.toString(), apiKey, fetchImpl);
+  if (outcome.kind === "network_error" || outcome.kind === "http_error") {
     return errorResult(LAND_PRICE_SOURCE_NAME);
-  } finally {
-    clearTimeout(timeoutId);
   }
-
-  if (AUTH_FAILURE_STATUSES.includes(response.status)) {
+  if (outcome.kind === "auth_failure") {
     return unavailableResult(LAND_PRICE_SOURCE_NAME);
   }
-  if (!response.ok) {
-    return errorResult(LAND_PRICE_SOURCE_NAME);
-  }
 
-  let json: unknown;
-  try {
-    json = await response.json();
-  } catch {
-    return errorResult(LAND_PRICE_SOURCE_NAME);
-  }
-
+  const json = outcome.json;
   if (!isLandPriceResponse(json)) {
     return errorResult(LAND_PRICE_SOURCE_NAME);
   }
