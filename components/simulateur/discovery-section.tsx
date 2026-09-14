@@ -561,7 +561,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               {candidates.map((c) => (
                 <li
                   key={c.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm"
+                  className="flex flex-col gap-2 rounded-lg border border-border/60 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
                 >
                   <span className="text-foreground">
                     <span aria-hidden>{VERDICT_ICONS[verdictById.get(c.id) ?? "UNKNOWN"]}</span>{" "}
@@ -571,7 +571,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
                       {` — ${LISTING_AVAILABILITY_LABELS[c.availabilityStatus]}`}
                     </span>
                   </span>
-                  <span className="flex shrink-0 gap-1">
+                  <span className="flex shrink-0 gap-1 self-end sm:self-auto">
                     <Button variant="ghost" size="sm" onClick={() => editCandidate(c)}>
                       Modifier
                     </Button>
