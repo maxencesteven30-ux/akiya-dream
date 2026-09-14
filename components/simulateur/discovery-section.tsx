@@ -15,18 +15,19 @@ import {
 } from "@/components/ui/select";
 import { formatJpy } from "@/lib/format";
 import type { SimulatorState } from "@/lib/types";
-import { deriveSearchProfileFromProject } from "@/lib/discovery/search-profile";
+import { deriveSearchProfileFromProject, type SearchProfile } from "@/lib/discovery/search-profile";
 import {
   buildPropertyListingFromManualIntake,
   createEmptyManualIntakeInput,
   type ManualIntakeInput,
 } from "@/lib/discovery/manual-intake";
 import { upsertCandidateListing, removeCandidateListing } from "@/lib/discovery/candidate-listings";
-import type { PropertyListing } from "@/lib/discovery/property-listing";
+import { LISTING_AVAILABILITY_LABELS, type PropertyListing } from "@/lib/discovery/property-listing";
 import {
   runDiscoveryEngine,
   type DiscoveryResultItem,
 } from "@/lib/discovery/discovery-orchestrator";
+import { SearchProfileEditor } from "@/components/simulateur/search-profile-editor";
 
 // Era 9 / Phase AN — Discovery UI.
 //
@@ -45,12 +46,18 @@ import {
 // (RealListingSection reste l'endroit où "j'ai trouvé mon bien").
 
 const CANDIDATES_STORAGE_KEY = "akiya-discovery-candidates";
+const PROFILE_STORAGE_KEY = "akiya-discovery-profile";
 
 const TRI_STATE_OPTIONS: { value: string; label: string }[] = [
   { value: "unknown", label: "Non renseigné" },
   { value: "true", label: "Oui" },
   { value: "false", label: "Non" },
 ];
+
+const AVAILABILITY_OPTIONS = Object.entries(LISTING_AVAILABILITY_LABELS).map(([value, label]) => ({
+  value,
+  label,
+}));
 
 function parseTriState(raw: string | null): boolean | null {
   if (raw === "true") return true;
@@ -80,6 +87,15 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
     }
   });
   const [intake, setIntake] = useState<ManualIntakeInput>(createEmptyManualIntakeInput());
+  const [profile, setProfile] = useState<SearchProfile | null>(() => {
+    try {
+      const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as SearchProfile) : null;
+    } catch (err) {
+      console.error("Lecture du profil de recherche depuis localStorage impossible:", err);
+      return null;
+    }
+  });
 
   useEffect(() => {
     try {
@@ -88,6 +104,15 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
       console.error("Écriture du pool de candidats dans localStorage impossible:", err);
     }
   }, [candidates]);
+
+  useEffect(() => {
+    if (profile === null) return;
+    try {
+      window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    } catch (err) {
+      console.error("Écriture du profil de recherche dans localStorage impossible:", err);
+    }
+  }, [profile]);
 
   if (!open) {
     return (
@@ -99,7 +124,8 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
     );
   }
 
-  const searchProfile = deriveSearchProfileFromProject(simulatorState);
+  const derivedProfile = deriveSearchProfileFromProject(simulatorState);
+  const searchProfile = profile ?? derivedProfile;
   const discoveryResult = runDiscoveryEngine(searchProfile, candidates);
 
   const update = (patch: Partial<ManualIntakeInput>) => setIntake((prev) => ({ ...prev, ...patch }));
@@ -128,18 +154,20 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               commercial sans autorisation vérifiée. Les termes japonais standard (徒歩X分,
               3LDK, 再建築可/不可, 浄化槽…) sont analysés automatiquement.
             </p>
-            {searchProfile.hardConstraints.maxBudgetJpy !== null && (
-              <p className="mt-2 text-xs font-medium text-foreground">
-                Budget maximum dérivé du projet : {formatJpy(searchProfile.hardConstraints.maxBudgetJpy)}
-              </p>
-            )}
           </div>
           <Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
             Fermer
           </Button>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
+        <SearchProfileEditor
+          profile={searchProfile}
+          derivedProfile={derivedProfile}
+          onChange={setProfile}
+          onResetToProject={() => setProfile(derivedProfile)}
+        />
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
             <Label htmlFor="discovery-source" className="mb-2 block">
               Source (ex. tomi-city-akiyabank)
@@ -288,6 +316,47 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
             />
           </div>
           <div>
+            <Label htmlFor="discovery-property-type" className="mb-2 block">
+              Catégorie brute telle qu&apos;affichée (ex. 宅地, 山林, 畑)
+            </Label>
+            <Input
+              id="discovery-property-type"
+              value={intake.propertyType ?? ""}
+              onChange={(e) => update({ propertyType: e.target.value.trim() === "" ? null : e.target.value })}
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <Label htmlFor="discovery-description" className="mb-2 block">
+              Description recopiée (optionnel)
+            </Label>
+            <textarea
+              id="discovery-description"
+              className="flex min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm"
+              value={intake.descriptionRaw ?? ""}
+              onChange={(e) => update({ descriptionRaw: e.target.value.trim() === "" ? null : e.target.value })}
+            />
+          </div>
+          <div>
+            <Label htmlFor="discovery-availability" className="mb-2 block">
+              Statut de l&apos;annonce
+            </Label>
+            <Select
+              value={intake.availabilityStatus}
+              onValueChange={(v) => update({ availabilityStatus: v as ManualIntakeInput["availabilityStatus"] })}
+            >
+              <SelectTrigger id="discovery-availability">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {AVAILABILITY_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>
+                    {o.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
             <Label htmlFor="discovery-garden" className="mb-2 block">
               Jardin
             </Label>
@@ -343,6 +412,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
                   <span>
                     {c.title ?? `${c.source} #${c.sourceListingId}`}
                     {c.priceJpy !== null ? ` — ${formatJpy(c.priceJpy)}` : " — prix inconnu"}
+                    {` — ${LISTING_AVAILABILITY_LABELS[c.availabilityStatus]}`}
                   </span>
                   <Button variant="ghost" size="sm" onClick={() => setCandidates((prev) => removeCandidateListing(prev, c.id))}>
                     Retirer
