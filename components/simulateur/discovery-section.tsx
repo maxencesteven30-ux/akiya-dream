@@ -22,11 +22,21 @@ import {
   type ManualIntakeInput,
 } from "@/lib/discovery/manual-intake";
 import {
+  parseAreaM2,
+  parseBuildingYearTerm,
+  parseFloorPlan,
+  parsePriceJpy,
+  parseRebuildabilityTerm,
+  parseSewageTerm,
+  parseWalkingDistance,
+} from "@/lib/discovery/japanese-terms";
+import {
   findCandidateListing,
   removeCandidateListing,
   upsertCandidateListing,
 } from "@/lib/discovery/candidate-listings";
 import { LISTING_AVAILABILITY_LABELS, type PropertyListing } from "@/lib/discovery/property-listing";
+import type { RealityGateItemStatus } from "@/lib/types";
 import {
   runDiscoveryEngine,
   type DiscoveryResultItem,
@@ -63,6 +73,12 @@ const AVAILABILITY_OPTIONS = Object.entries(LISTING_AVAILABILITY_LABELS).map(([v
   label,
 }));
 
+const VERDICT_ICONS: Record<"PASS" | "FAIL" | "UNKNOWN", string> = {
+  PASS: "✅",
+  FAIL: "⛔",
+  UNKNOWN: "🟠",
+};
+
 function parseTriState(raw: string | null): boolean | null {
   if (raw === "true") return true;
   if (raw === "false") return false;
@@ -73,6 +89,30 @@ function triStateValue(value: boolean | null): string {
   if (value === true) return "true";
   if (value === false) return "false";
   return "unknown";
+}
+
+const REBUILDABILITY_HINT_LABELS: Partial<Record<RealityGateItemStatus, string>> = {
+  verifie: "droit de reconstruire confirmé",
+  probleme: "non reconstructible (再建築不可)",
+};
+
+const SEWAGE_HINT_LABELS: Partial<Record<RealityGateItemStatus, string>> = {
+  verifie: "raccordement fonctionnel (tout-à-l'égout ou fosse agréée)",
+  probleme: "fosse d'aisance non raccordée (汲み取り)",
+};
+
+// Retour visuel immédiat sur ce que le parseur a compris — sans ça,
+// une saisie non reconnue reste silencieusement "à vérifier" plus loin
+// dans le pipeline, sans que l'utilisateur sache pourquoi.
+function ParseHint({ raw, hint }: { raw: string | null; hint: string | null }) {
+  if (raw === null || raw.trim() === "") return null;
+  return hint ? (
+    <p className="mt-1 text-xs text-muted-foreground">✓ compris : {hint}</p>
+  ) : (
+    <p className="mt-1 text-xs text-amber-600">
+      ⚠️ format non reconnu — restera &quot;à vérifier&quot;, jamais deviné
+    </p>
+  );
 }
 
 interface DiscoverySectionProps {
@@ -91,6 +131,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
     }
   });
   const [intake, setIntake] = useState<ManualIntakeInput>(createEmptyManualIntakeInput());
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [profile, setProfile] = useState<SearchProfile | null>(() => {
     try {
       const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
@@ -127,6 +168,13 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
     () => runDiscoveryEngine(searchProfile, candidates),
     [searchProfile, candidates],
   );
+  const verdictById = useMemo(() => {
+    const map = new Map<string, "PASS" | "FAIL" | "UNKNOWN">();
+    for (const item of discoveryResult.eligible) map.set(item.listing.id, "PASS");
+    for (const item of discoveryResult.needsReview) map.set(item.listing.id, "UNKNOWN");
+    for (const item of discoveryResult.excluded) map.set(item.listing.id, "FAIL");
+    return map;
+  }, [discoveryResult]);
 
   if (!open) {
     return (
@@ -144,20 +192,62 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
     if (intake.source.trim() === "" || intake.sourceListingId.trim() === "") return;
     const existing = findCandidateListing(candidates, intake.source, intake.sourceListingId);
     const listing = buildPropertyListingFromManualIntake(
-      existing?.id ?? `${intake.source}:${intake.sourceListingId}:${Date.now()}`,
+      existing?.id ?? editingId ?? `${intake.source}:${intake.sourceListingId}:${Date.now()}`,
       intake,
     );
     setCandidates((prev) => upsertCandidateListing(prev, listing));
     setIntake(createEmptyManualIntakeInput());
+    setEditingId(null);
   };
 
   // Recharge la saisie brute d'un candidat déjà dans le pool pour la
   // corriger — ré-ajouter remplace au même id (upsertCandidateListing),
-  // jamais un doublon.
+  // jamais un doublon. editingId trace explicitement quelle annonce est
+  // en cours de modification, pour ne jamais en créer une nouvelle par
+  // erreur si l'utilisateur modifie aussi source/numéro d'annonce.
   const editCandidate = (candidate: PropertyListing) => {
     const rawIntake = candidate.rawData as ManualIntakeInput | null;
     if (rawIntake) setIntake(rawIntake);
+    setEditingId(candidate.id);
   };
+
+  const cancelEdit = () => {
+    setIntake(createEmptyManualIntakeInput());
+    setEditingId(null);
+  };
+
+  const priceHint = intake.priceRaw ? (() => {
+    const value = parsePriceJpy(intake.priceRaw!);
+    return value !== null ? formatJpy(value) : null;
+  })() : null;
+  const landAreaHint = intake.landAreaRaw ? (() => {
+    const value = parseAreaM2(intake.landAreaRaw!);
+    return value !== null ? `${value} m²` : null;
+  })() : null;
+  const buildingAreaHint = intake.buildingAreaRaw ? (() => {
+    const value = parseAreaM2(intake.buildingAreaRaw!);
+    return value !== null ? `${value} m²` : null;
+  })() : null;
+  const floorPlanHint = intake.floorPlanRaw ? (() => {
+    const result = parseFloorPlan(intake.floorPlanRaw!);
+    return result ? `${result.roomCount} pièce(s) hors salon/cuisine` : null;
+  })() : null;
+  const buildingYearHint = intake.buildingYearRaw ? (() => {
+    const year = parseBuildingYearTerm(intake.buildingYearRaw!);
+    return year !== null ? `construit en ${year}` : null;
+  })() : null;
+  const stationDistanceHint = intake.stationDistanceRaw ? (() => {
+    const result = parseWalkingDistance(intake.stationDistanceRaw!);
+    return result ? `${result.value} min à pied` : null;
+  })() : null;
+  const rebuildabilityHint = intake.rebuildabilityRaw ? (() => {
+    const status = parseRebuildabilityTerm(intake.rebuildabilityRaw!);
+    return status ? (REBUILDABILITY_HINT_LABELS[status] ?? null) : null;
+  })() : null;
+  const sewageHint = intake.sewageRaw ? (() => {
+    const status = parseSewageTerm(intake.sewageRaw!);
+    return status ? (SEWAGE_HINT_LABELS[status] ?? null) : null;
+  })() : null;
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
@@ -185,6 +275,15 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
           onChange={setProfile}
           onResetToProject={() => setProfile(derivedProfile)}
         />
+
+        {editingId !== null && (
+          <div className="mt-4 flex items-center justify-between rounded-md border border-amber-600/40 bg-amber-600/10 px-3 py-2 text-xs text-amber-700">
+            <span>Modification de l&apos;annonce {intake.source} #{intake.sourceListingId}</span>
+            <Button variant="ghost" size="sm" onClick={cancelEdit}>
+              Annuler
+            </Button>
+          </div>
+        )}
 
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div>
@@ -237,6 +336,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               value={intake.priceRaw ?? ""}
               onChange={(e) => update({ priceRaw: e.target.value.trim() === "" ? null : e.target.value })}
             />
+            <ParseHint raw={intake.priceRaw} hint={priceHint} />
           </div>
           <div>
             <Label htmlFor="discovery-prefecture" className="mb-2 block">
@@ -269,6 +369,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               value={intake.landAreaRaw ?? ""}
               onChange={(e) => update({ landAreaRaw: e.target.value.trim() === "" ? null : e.target.value })}
             />
+            <ParseHint raw={intake.landAreaRaw} hint={landAreaHint} />
           </div>
           <div>
             <Label htmlFor="discovery-building-area" className="mb-2 block">
@@ -279,6 +380,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               value={intake.buildingAreaRaw ?? ""}
               onChange={(e) => update({ buildingAreaRaw: e.target.value.trim() === "" ? null : e.target.value })}
             />
+            <ParseHint raw={intake.buildingAreaRaw} hint={buildingAreaHint} />
           </div>
           <div>
             <Label htmlFor="discovery-floor-plan" className="mb-2 block">
@@ -289,6 +391,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               value={intake.floorPlanRaw ?? ""}
               onChange={(e) => update({ floorPlanRaw: e.target.value.trim() === "" ? null : e.target.value })}
             />
+            <ParseHint raw={intake.floorPlanRaw} hint={floorPlanHint} />
           </div>
           <div>
             <Label htmlFor="discovery-building-year" className="mb-2 block">
@@ -299,6 +402,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               value={intake.buildingYearRaw ?? ""}
               onChange={(e) => update({ buildingYearRaw: e.target.value.trim() === "" ? null : e.target.value })}
             />
+            <ParseHint raw={intake.buildingYearRaw} hint={buildingYearHint} />
           </div>
           <div>
             <Label htmlFor="discovery-station-distance" className="mb-2 block">
@@ -311,6 +415,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
                 update({ stationDistanceRaw: e.target.value.trim() === "" ? null : e.target.value })
               }
             />
+            <ParseHint raw={intake.stationDistanceRaw} hint={stationDistanceHint} />
           </div>
           <div>
             <Label htmlFor="discovery-rebuildability" className="mb-2 block">
@@ -323,6 +428,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
                 update({ rebuildabilityRaw: e.target.value.trim() === "" ? null : e.target.value })
               }
             />
+            <ParseHint raw={intake.rebuildabilityRaw} hint={rebuildabilityHint} />
           </div>
           <div>
             <Label htmlFor="discovery-sewage" className="mb-2 block">
@@ -333,6 +439,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               value={intake.sewageRaw ?? ""}
               onChange={(e) => update({ sewageRaw: e.target.value.trim() === "" ? null : e.target.value })}
             />
+            <ParseHint raw={intake.sewageRaw} hint={sewageHint} />
           </div>
           <div>
             <Label htmlFor="discovery-property-type" className="mb-2 block">
@@ -416,7 +523,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
             onClick={addToPool}
             disabled={intake.source.trim() === "" || intake.sourceListingId.trim() === ""}
           >
-            Ajouter au pool de candidats
+            {editingId !== null ? "Enregistrer les modifications" : "Ajouter au pool de candidats"}
           </Button>
         </div>
 
@@ -429,6 +536,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
               {candidates.map((c) => (
                 <li key={c.id} className="flex items-center justify-between gap-2">
                   <span>
+                    {VERDICT_ICONS[verdictById.get(c.id) ?? "UNKNOWN"]}{" "}
                     {c.title ?? `${c.source} #${c.sourceListingId}`}
                     {c.priceJpy !== null ? ` — ${formatJpy(c.priceJpy)}` : " — prix inconnu"}
                     {` — ${LISTING_AVAILABILITY_LABELS[c.availabilityStatus]}`}
@@ -448,10 +556,18 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
         )}
 
         {candidates.length > 0 && (
-          <div className="mt-6 grid gap-4 border-t border-border pt-4 sm:grid-cols-3">
-            <DiscoveryResultColumn title="✅ Éligibles" items={discoveryResult.eligible} />
-            <DiscoveryResultColumn title="🟠 À vérifier (inconnu)" items={discoveryResult.needsReview} />
-            <DiscoveryResultColumn title="⛔ Exclus" items={discoveryResult.excluded} />
+          <div className="mt-6 border-t border-border pt-4">
+            <p className="mb-3 text-sm text-muted-foreground">
+              {discoveryResult.eligible.length} éligible{discoveryResult.eligible.length > 1 ? "s" : ""} ·{" "}
+              {discoveryResult.needsReview.length} à vérifier ·{" "}
+              {discoveryResult.excluded.length} exclu{discoveryResult.excluded.length > 1 ? "s" : ""} sur{" "}
+              {candidates.length} candidat{candidates.length > 1 ? "s" : ""}
+            </p>
+            <div className="grid gap-4 sm:grid-cols-3">
+              <DiscoveryResultColumn title="✅ Éligibles" items={discoveryResult.eligible} />
+              <DiscoveryResultColumn title="🟠 À vérifier (inconnu)" items={discoveryResult.needsReview} />
+              <DiscoveryResultColumn title="⛔ Exclus" items={discoveryResult.excluded} />
+            </div>
           </div>
         )}
       </Card>
