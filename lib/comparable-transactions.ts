@@ -1,5 +1,5 @@
 import { getBuildingEraCode } from "@/lib/building-eras";
-import type { MlitTransaction } from "@/lib/mlit/types";
+import { comparePeriods, parsePeriod, type MlitTransaction } from "@/lib/mlit/types";
 
 // Phase AI — Comparable Transactions Engine.
 //
@@ -110,9 +110,19 @@ export interface MarketComparison {
   comparableCount: number;
   partiallyComparableCount: number;
   periodsCovered: string[];
+  // Bornes temporelles des transactions disponibles (AD.1.6) — permet de
+  // voir si les comparables sont anciens, jamais une correction ou une
+  // pondération temporelle inventée. null si aucune période n'est
+  // parsable.
+  oldestPeriod: string | null;
+  newestPeriod: string | null;
   // Écart min/max des prix des transactions réellement comparables —
   // null si aucune n'est comparable.
   priceDispersionJpy: { minJpy: number; maxJpy: number } | null;
+  // Médiane des prix comparables — uniquement lorsque l'échantillon est
+  // jugé suffisant (même seuil que la confiance HIGH, 3+) ; en dessous,
+  // une médiane donnerait une fausse impression de robustesse statistique.
+  medianPriceJpy: number | null;
   missingDataCount: number;
   confidence: "HIGH" | "MEDIUM" | "LOW";
   limits: string[];
@@ -120,6 +130,16 @@ export interface MarketComparison {
 
 const HIGH_CONFIDENCE_MIN_COMPARABLES = 3;
 const MEDIUM_CONFIDENCE_MIN_COMPARABLES = 1;
+
+function computeMedian(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0 ? (sorted[mid - 1] + sorted[mid]) / 2 : sorted[mid];
+}
+
+function formatPeriod(period: { year: number; quarter: 1 | 2 | 3 | 4 }): string {
+  return `${period.year}年第${period.quarter}四半期`;
+}
 
 export function computeMarketComparison(
   subject: ComparableSubject,
@@ -136,6 +156,16 @@ export function computeMarketComparison(
     comparablePrices.length > 0
       ? { minJpy: Math.min(...comparablePrices), maxJpy: Math.max(...comparablePrices) }
       : null;
+
+  const medianPriceJpy =
+    comparable.length >= HIGH_CONFIDENCE_MIN_COMPARABLES ? computeMedian(comparablePrices) : null;
+
+  const parsedPeriods = transactions
+    .map((t) => parsePeriod(t.period))
+    .filter((p): p is NonNullable<typeof p> => p !== null)
+    .sort(comparePeriods);
+  const oldestPeriod = parsedPeriods.length > 0 ? formatPeriod(parsedPeriods[0]) : null;
+  const newestPeriod = parsedPeriods.length > 0 ? formatPeriod(parsedPeriods[parsedPeriods.length - 1]) : null;
 
   const confidence: MarketComparison["confidence"] =
     comparable.length >= HIGH_CONFIDENCE_MIN_COMPARABLES
@@ -161,7 +191,10 @@ export function computeMarketComparison(
     comparableCount: comparable.length,
     partiallyComparableCount: partial.length,
     periodsCovered: [...new Set(transactions.map((t) => t.period))],
+    oldestPeriod,
+    newestPeriod,
     priceDispersionJpy,
+    medianPriceJpy,
     missingDataCount: insufficient.length,
     confidence,
     limits,

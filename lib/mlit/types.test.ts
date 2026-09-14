@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMlitTransaction, type MlitTransactionRaw } from "@/lib/mlit/types";
+import { comparePeriods, parseMlitTransaction, parsePeriod, type MlitTransactionRaw } from "@/lib/mlit/types";
 
 // Champs issus d'une réponse réelle de l'API XIT001 (vérifiée manuellement
 // le 2026-09-14, ville=20201 Nagano) — pas une fixture inventée.
@@ -78,5 +78,32 @@ describe("parseMlitTransaction", () => {
   it("retourne null pour chaque champ optionnel vide plutôt qu'une chaîne vide", () => {
     const result = parseMlitTransaction(REAL_SHAPE_TRANSACTION);
     expect(result?.structure).toBeNull();
+  });
+});
+
+describe("parsePeriod", () => {
+  it("convertit '2023年第2四半期' en {year: 2023, quarter: 2}", () => {
+    expect(parsePeriod("2023年第2四半期")).toEqual({ year: 2023, quarter: 2 });
+  });
+
+  it("retourne null pour un format inattendu, jamais une période devinée", () => {
+    expect(parsePeriod("")).toBeNull();
+    expect(parsePeriod("2023")).toBeNull();
+    expect(parsePeriod("n'importe quoi")).toBeNull();
+  });
+});
+
+describe("comparePeriods", () => {
+  it("ordonne par année puis par trimestre", () => {
+    const periods = [
+      { year: 2023, quarter: 2 as const },
+      { year: 2006, quarter: 4 as const },
+      { year: 2023, quarter: 1 as const },
+    ];
+    expect([...periods].sort(comparePeriods)).toEqual([
+      { year: 2006, quarter: 4 },
+      { year: 2023, quarter: 1 },
+      { year: 2023, quarter: 2 },
+    ]);
   });
 });

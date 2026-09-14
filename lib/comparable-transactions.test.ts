@@ -105,4 +105,58 @@ describe("computeMarketComparison", () => {
     const result = computeMarketComparison(SUBJECT, [transaction({ districtCode: "A" })]);
     expect(result.confidence).toBe("MEDIUM");
   });
+
+  it("AD.1.4 — distingue explicitement 0, 1, 2 et 3 comparables, jamais assimilés à 'un marché'", () => {
+    const zero = computeMarketComparison(SUBJECT, []);
+    const one = computeMarketComparison(SUBJECT, [transaction({ districtCode: "A" })]);
+    const two = computeMarketComparison(SUBJECT, [
+      transaction({ districtCode: "A" }),
+      transaction({ districtCode: "B" }),
+    ]);
+    const three = computeMarketComparison(SUBJECT, [
+      transaction({ districtCode: "A" }),
+      transaction({ districtCode: "B" }),
+      transaction({ districtCode: "C" }),
+    ]);
+    expect([zero.comparableCount, one.comparableCount, two.comparableCount, three.comparableCount]).toEqual([
+      0, 1, 2, 3,
+    ]);
+    expect([zero.confidence, one.confidence, two.confidence, three.confidence]).toEqual([
+      "LOW",
+      "MEDIUM",
+      "MEDIUM",
+      "HIGH",
+    ]);
+  });
+
+  it("AD.1.5 — médiane calculée seulement à partir de 3 comparables (échantillon jugé suffisant)", () => {
+    const twoComparables = computeMarketComparison(SUBJECT, [
+      transaction({ districtCode: "A", tradePriceJpy: 4_000_000 }),
+      transaction({ districtCode: "B", tradePriceJpy: 6_000_000 }),
+    ]);
+    expect(twoComparables.medianPriceJpy).toBeNull();
+
+    const threeComparables = computeMarketComparison(SUBJECT, [
+      transaction({ districtCode: "A", tradePriceJpy: 4_000_000 }),
+      transaction({ districtCode: "B", tradePriceJpy: 5_000_000 }),
+      transaction({ districtCode: "C", tradePriceJpy: 9_000_000 }),
+    ]);
+    expect(threeComparables.medianPriceJpy).toBe(5_000_000);
+  });
+
+  it("AD.1.6 — expose la transaction la plus ancienne et la plus récente, jamais masquées", () => {
+    const result = computeMarketComparison(SUBJECT, [
+      transaction({ districtCode: "A", period: "2023年第2四半期" }),
+      transaction({ districtCode: "B", period: "2006年第1四半期" }),
+      transaction({ districtCode: "C", period: "2024年第4四半期" }),
+    ]);
+    expect(result.oldestPeriod).toBe("2006年第1四半期");
+    expect(result.newestPeriod).toBe("2024年第4四半期");
+  });
+
+  it("oldestPeriod/newestPeriod restent null quand aucune période n'est parsable", () => {
+    const result = computeMarketComparison(SUBJECT, [transaction({ period: "format inattendu" })]);
+    expect(result.oldestPeriod).toBeNull();
+    expect(result.newestPeriod).toBeNull();
+  });
 });

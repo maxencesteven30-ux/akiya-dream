@@ -74,6 +74,28 @@ function parseJapaneseYear(raw: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
+export interface MlitPeriod {
+  year: number;
+  quarter: 1 | 2 | 3 | 4;
+}
+
+// AD.1.6 : "2023年第2四半期" -> {year: 2023, quarter: 2}. Permet de
+// comparer numériquement l'ancienneté de deux transactions — jamais une
+// correction ou une pondération temporelle inventée, juste un tri
+// possible. Retourne null si le format ne correspond pas exactement à
+// celui observé dans l'API (jamais une période devinée).
+export function parsePeriod(raw: string): MlitPeriod | null {
+  const match = raw.match(/^(\d{4})年第([1-4])四半期$/);
+  if (!match) return null;
+  return { year: Number(match[1]), quarter: Number(match[2]) as 1 | 2 | 3 | 4 };
+}
+
+// Compare deux périodes : négatif si `a` est antérieure à `b`, positif si
+// postérieure, 0 si identique — utilisable directement avec Array.sort.
+export function comparePeriods(a: MlitPeriod, b: MlitPeriod): number {
+  return a.year - b.year || a.quarter - b.quarter;
+}
+
 function parseOptionalNumber(raw: string): number | null {
   if (raw.trim() === "") return null;
   const value = Number(raw);

@@ -14,6 +14,18 @@ const MLIT_SOURCE_NAME = "MLIT — 不動産情報ライブラリ (transactions 
 const MLIT_SOURCE_URL = "https://www.reinfolib.mlit.go.jp/";
 const MLIT_ENDPOINT = "https://www.reinfolib.mlit.go.jp/ex-api/external/XIT001";
 
+// AD.1.2 : au-delà de 10s, on considère l'appel en échec plutôt que de
+// bloquer indéfiniment le Route Handler — aucune donnée n'attend un
+// réseau qui ne répond pas.
+const REQUEST_TIMEOUT_MS = 10_000;
+
+// AD.1.2 : 401/403 signifient que la clé configurée n'est plus valable —
+// c'est la source elle-même qui n'est pas utilisable dans cet état,
+// exactement la définition d'UNAVAILABLE (cf. lib/reality-data.ts).
+// Jamais confondu avec ERROR (429, 5xx, réseau) qui reste une panne
+// technique ponctuelle, potentiellement transitoire.
+const AUTH_FAILURE_STATUSES = [401, 403];
+
 export interface FetchComparableTransactionsParams {
   // Code municipal à 5 chiffres (総務省) — null si non disponible :
   // Akiya Dream n'a aujourd'hui qu'une ville en texte libre, pas de code
@@ -64,13 +76,27 @@ export async function fetchComparableTransactions(
     url.searchParams.set("priceClassification", params.priceClassification);
   }
 
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), REQUEST_TIMEOUT_MS);
+
   let response: Response;
   try {
     response = await fetchImpl(url.toString(), {
       headers: { "Ocp-Apim-Subscription-Key": apiKey },
+      signal: timeoutController.signal,
     });
   } catch {
+    // Regroupe timeout (AbortError), échec réseau et toute autre
+    // exception : dans les trois cas, l'appel n'a techniquement pas
+    // abouti — ERROR, jamais UNAVAILABLE (qui signifierait une source
+    // mal configurée, pas un problème réseau ponctuel).
     return errorResult(MLIT_SOURCE_NAME);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (AUTH_FAILURE_STATUSES.includes(response.status)) {
+    return unavailableResult(MLIT_SOURCE_NAME);
   }
 
   if (!response.ok) {

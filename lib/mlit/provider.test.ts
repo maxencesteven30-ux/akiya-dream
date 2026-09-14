@@ -15,6 +15,12 @@ function mockFetch(body: unknown, ok = true): typeof fetch {
   return vi.fn().mockResolvedValue({ ok, json: () => Promise.resolve(body) }) as unknown as typeof fetch;
 }
 
+function mockFetchWithStatus(status: number): typeof fetch {
+  return vi
+    .fn()
+    .mockResolvedValue({ ok: false, status, json: () => Promise.resolve({}) }) as unknown as typeof fetch;
+}
+
 const BASE_PARAMS = { municipalityCode: "20201", year: 2024, quarter: 1 as const };
 
 describe("fetchComparableTransactions", () => {
@@ -84,6 +90,28 @@ describe("fetchComparableTransactions", () => {
     expect(result.status).toBe("ERROR");
   });
 
+  it("8d. timeout (AbortError) → ERROR, jamais un blocage indéfini", async () => {
+    const abortError = new DOMException("The operation was aborted.", "AbortError");
+    const timingOutFetch = vi.fn().mockRejectedValue(abortError) as unknown as typeof fetch;
+    const result = await fetchComparableTransactions(BASE_PARAMS, timingOutFetch);
+    expect(result.status).toBe("ERROR");
+  });
+
+  it("8e. 401 (clé invalide) → UNAVAILABLE, jamais ERROR (source mal configurée, pas une panne technique)", async () => {
+    const result = await fetchComparableTransactions(BASE_PARAMS, mockFetchWithStatus(401));
+    expect(result.status).toBe("UNAVAILABLE");
+  });
+
+  it("8f. 403 (accès refusé) → UNAVAILABLE", async () => {
+    const result = await fetchComparableTransactions(BASE_PARAMS, mockFetchWithStatus(403));
+    expect(result.status).toBe("UNAVAILABLE");
+  });
+
+  it("8g. 429 (limite de requêtes) → ERROR, jamais UNAVAILABLE (panne technique ponctuelle, pas une mauvaise configuration)", async () => {
+    const result = await fetchComparableTransactions(BASE_PARAMS, mockFetchWithStatus(429));
+    expect(result.status).toBe("ERROR");
+  });
+
   it("8c. réponse HTTP non ok → ERROR", async () => {
     const result = await fetchComparableTransactions(BASE_PARAMS, mockFetch({}, false));
     expect(result.status).toBe("ERROR");
@@ -98,6 +126,15 @@ describe("fetchComparableTransactions", () => {
   it("10. transactions hétérogènes → toutes renvoyées, la classification reste à un moteur séparé", async () => {
     const result = await fetchComparableTransactions(BASE_PARAMS, mockFetch(SYNTHETIC_HETEROGENEOUS_TRANSACTIONS));
     expect(result.data?.map((t) => t.use)).toEqual(["住宅", "商業", "農地"]);
+  });
+
+  it("transmet un AbortSignal à fetch (AD.1.2) — le timeout est réellement câblé, pas seulement documenté", async () => {
+    const fetchSpy = mockFetch(SYNTHETIC_SINGLE_TRANSACTION);
+    await fetchComparableTransactions(BASE_PARAMS, fetchSpy);
+    expect(fetchSpy).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
   });
 
   it("inclut systématiquement source/date/fetchedAt dans les métadonnées", async () => {
