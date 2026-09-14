@@ -52,13 +52,14 @@ interface RemoteOwnerSectionProps {
 const NOT_SET = "non_renseigne";
 
 interface EnumSelectProps<T extends string> {
+  id: string;
   value: T | null;
   onChange: (value: T | null) => void;
   labels: Record<T, string>;
   className?: string;
 }
 
-function EnumSelect<T extends string>({ value, onChange, labels, className }: EnumSelectProps<T>) {
+function EnumSelect<T extends string>({ id, value, onChange, labels, className }: EnumSelectProps<T>) {
   const options = Object.keys(labels) as T[];
   return (
     <Select
@@ -68,7 +69,7 @@ function EnumSelect<T extends string>({ value, onChange, labels, className }: En
         onChange(v === NOT_SET ? null : (v as T));
       }}
     >
-      <SelectTrigger className={className ?? "w-full"}>
+      <SelectTrigger id={id} className={className ?? "w-full"}>
         <SelectValue>
           {(v: T | typeof NOT_SET) => (v === NOT_SET ? "Non renseigné" : (labels[v] ?? v))}
         </SelectValue>
@@ -123,8 +124,11 @@ export function RemoteOwnerSection({ profile, onChange, onAdminItemChange }: Rem
       <Card className="border-border p-6 sm:p-8">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label className="mb-1.5 block text-sm">Lieu de résidence</Label>
+            <Label htmlFor="remote-residence-location" className="mb-1.5 block text-sm">
+              Lieu de résidence
+            </Label>
             <EnumSelect<ResidenceLocation>
+              id="remote-residence-location"
               value={profile.residenceLocation}
               onChange={(v) => onChange("residenceLocation", v)}
               labels={RESIDENCE_LOCATION_LABELS}
@@ -132,8 +136,11 @@ export function RemoteOwnerSection({ profile, onChange, onAdminItemChange }: Rem
           </div>
 
           <div>
-            <Label className="mb-1.5 block text-sm">Quel est ton objectif ?</Label>
+            <Label htmlFor="remote-ownership-goal" className="mb-1.5 block text-sm">
+              Quel est ton objectif ?
+            </Label>
             <EnumSelect<OwnershipGoal>
+              id="remote-ownership-goal"
               value={profile.ownershipGoal}
               onChange={(v) => onChange("ownershipGoal", v)}
               labels={OWNERSHIP_GOAL_LABELS}
@@ -168,18 +175,22 @@ export function RemoteOwnerSection({ profile, onChange, onAdminItemChange }: Rem
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label className="mb-1.5 block text-sm">J&apos;y habiterai</Label>
+            <Label htmlFor="remote-usage-frequency" className="mb-1.5 block text-sm">
+              J&apos;y habiterai
+            </Label>
             <EnumSelect<UsageFrequency>
+              id="remote-usage-frequency"
               value={profile.usageFrequency}
               onChange={(v) => onChange("usageFrequency", v)}
               labels={USAGE_FREQUENCY_LABELS}
             />
           </div>
           <div>
-            <Label className="mb-1.5 block text-sm">
+            <Label htmlFor="remote-vacancy-duration" className="mb-1.5 block text-sm">
               Combien de temps la maison restera-t-elle vide ?
             </Label>
             <EnumSelect<VacancyDuration>
+              id="remote-vacancy-duration"
               value={profile.vacancyDuration}
               onChange={(v) => onChange("vacancyDuration", v)}
               labels={VACANCY_DURATION_LABELS}
@@ -194,16 +205,22 @@ export function RemoteOwnerSection({ profile, onChange, onAdminItemChange }: Rem
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label className="mb-1.5 block text-sm">Qui vérifie la maison ?</Label>
+            <Label htmlFor="remote-caretaker" className="mb-1.5 block text-sm">
+              Qui vérifie la maison ?
+            </Label>
             <EnumSelect<CaretakerType>
+              id="remote-caretaker"
               value={profile.caretaker}
               onChange={(v) => onChange("caretaker", v)}
               labels={CARETAKER_LABELS}
             />
           </div>
           <div>
-            <Label className="mb-1.5 block text-sm">À quelle fréquence ?</Label>
+            <Label htmlFor="remote-check-frequency" className="mb-1.5 block text-sm">
+              À quelle fréquence ?
+            </Label>
             <EnumSelect<CheckFrequency>
+              id="remote-check-frequency"
               value={profile.checkFrequency}
               onChange={(v) => onChange("checkFrequency", v)}
               labels={CHECK_FREQUENCY_LABELS}
@@ -224,10 +241,11 @@ export function RemoteOwnerSection({ profile, onChange, onAdminItemChange }: Rem
       </Card>
 
       <Card className="mt-4 border-border p-6 sm:p-8">
-        <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        <Label htmlFor="remote-ownership-purpose" className="mb-3 block text-xs font-medium uppercase tracking-wide text-muted-foreground">
           💰 Type de projet
-        </p>
+        </Label>
         <EnumSelect<OwnershipPurpose>
+          id="remote-ownership-purpose"
           value={profile.ownershipPurpose}
           onChange={(v) => onChange("ownershipPurpose", v)}
           labels={OWNERSHIP_PURPOSE_LABELS}
@@ -253,6 +271,7 @@ export function RemoteOwnerSection({ profile, onChange, onAdminItemChange }: Rem
             {NON_RESIDENT_ADMIN_TEMPLATE.map((item) => (
               <li key={item.id} className="flex items-center gap-2 text-sm">
                 <Checkbox
+                  aria-label={item.label}
                   checked={profile.nonResidentAdmin[item.id] === true}
                   onCheckedChange={(checked) => onAdminItemChange(item.id, checked === true)}
                 />

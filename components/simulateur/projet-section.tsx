@@ -120,12 +120,14 @@ export function ProjetSection({
       </div>
 
       <div>
-        <Label className="mb-3 block">Région</Label>
+        <Label htmlFor="projet-prefecture" className="mb-3 block">
+          Région
+        </Label>
         <Select
           value={prefecture ?? ""}
           onValueChange={(v) => v && onPrefectureChange(v)}
         >
-          <SelectTrigger className="w-full sm:w-80">
+          <SelectTrigger id="projet-prefecture" className="w-full sm:w-80">
             <SelectValue placeholder="Choisissez une préfecture" />
           </SelectTrigger>
           <SelectContent>

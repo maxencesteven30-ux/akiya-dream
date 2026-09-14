@@ -114,7 +114,7 @@ export function DueDiligenceSection({ state, onChange }: DueDiligenceSectionProp
                             value={status}
                             onValueChange={(v) => v && onChange(item.id, v as ChecklistStatus)}
                           >
-                            <SelectTrigger className="w-44 shrink-0">
+                            <SelectTrigger className="w-44 shrink-0" aria-label={item.label}>
                               <SelectValue>
                                 {(value: ChecklistStatus) => STATUS_LABELS[value] ?? value}
                               </SelectValue>

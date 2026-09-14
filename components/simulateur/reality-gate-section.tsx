@@ -126,7 +126,7 @@ export function RealityGateSection({
                             value={status}
                             onValueChange={(v) => v && onChange(item.id, v as RealityGateItemStatus)}
                           >
-                            <SelectTrigger className="w-56 shrink-0">
+                            <SelectTrigger className="w-56 shrink-0" aria-label={item.label}>
                               <SelectValue>
                                 {(value: RealityGateItemStatus) =>
                                   REALITY_GATE_STATUS_LABELS[value] ?? value
@@ -163,7 +163,7 @@ export function RealityGateSection({
             onLandNatureChange(v === NOT_SET ? null : (v as LandNature));
           }}
         >
-          <SelectTrigger className="w-full sm:w-80">
+          <SelectTrigger className="w-full sm:w-80" aria-label="Nature juridique du terrain">
             <SelectValue>
               {(value: LandNature | typeof NOT_SET) =>
                 value === NOT_SET ? "Non renseigné" : (LAND_NATURE_LABELS[value] ?? value)
@@ -199,6 +199,7 @@ export function RealityGateSection({
           {REALITY_GATE_DOCUMENTS_TEMPLATE.map((doc) => (
             <li key={doc.id} className="flex items-center gap-2 text-sm">
               <Checkbox
+                aria-label={doc.label}
                 checked={documents[doc.id] === true}
                 onCheckedChange={(checked) => onDocumentsChange(doc.id, checked === true)}
               />

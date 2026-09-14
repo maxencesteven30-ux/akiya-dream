@@ -137,9 +137,11 @@ export function DocumentsSection({ projectId, onDocumentsChange }: DocumentsSect
       <Card className="border-border p-6 sm:p-8">
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <Label className="mb-1.5 block text-sm">Type de pièce</Label>
+            <Label htmlFor="document-category" className="mb-1.5 block text-sm">
+              Type de pièce
+            </Label>
             <Select value={category} onValueChange={(v) => v && setCategory(v as PieceCategory)}>
-              <SelectTrigger className="w-full">
+              <SelectTrigger id="document-category" className="w-full">
                 <SelectValue>
                   {(value: PieceCategory) => PIECE_CATEGORY_LABELS[value] ?? value}
                 </SelectValue>
@@ -154,8 +156,15 @@ export function DocumentsSection({ projectId, onDocumentsChange }: DocumentsSect
             </Select>
           </div>
           <div>
-            <Label className="mb-1.5 block text-sm">Note (optionnel)</Label>
-            <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="ex. Devis toiture" />
+            <Label htmlFor="document-note" className="mb-1.5 block text-sm">
+              Note (optionnel)
+            </Label>
+            <Input
+              id="document-note"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="ex. Devis toiture"
+            />
           </div>
         </div>
 

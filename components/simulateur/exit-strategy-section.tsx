@@ -128,12 +128,12 @@ export function ExitStrategySection({
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label className="mb-1.5 block text-sm">Horizon</Label>
+              <Label htmlFor="exit-horizon" className="mb-1.5 block text-sm">Horizon</Label>
               <Select
                 value={String(profile.horizonYears)}
                 onValueChange={(v) => v && onChange("horizonYears", Number(v) as ProjectionHorizonYears)}
               >
-                <SelectTrigger className="w-full">
+                <SelectTrigger id="exit-horizon" className="w-full">
                   <SelectValue>{(value: string) => `${value} ans`}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -146,8 +146,11 @@ export function ExitStrategySection({
               </Select>
             </div>
             <div>
-              <Label className="mb-1.5 block text-sm">Valeur de revente hypothétique (JPY)</Label>
+              <Label htmlFor="exit-resale-value" className="mb-1.5 block text-sm">
+                Valeur de revente hypothétique (JPY)
+              </Label>
               <Input
+                id="exit-resale-value"
                 type="number"
                 value={profile.resaleValueJpy ?? ""}
                 onChange={(e) => onChange("resaleValueJpy", parseNumber(e.target.value))}
@@ -196,8 +199,11 @@ export function ExitStrategySection({
           </p>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <Label className="mb-1.5 block text-sm">Loyer mensuel hypothétique (JPY)</Label>
+              <Label htmlFor="exit-monthly-rent" className="mb-1.5 block text-sm">
+                Loyer mensuel hypothétique (JPY)
+              </Label>
               <Input
+                id="exit-monthly-rent"
                 type="number"
                 value={profile.monthlyRentJpy ?? ""}
                 onChange={(e) => onChange("monthlyRentJpy", parseNumber(e.target.value))}
@@ -205,8 +211,11 @@ export function ExitStrategySection({
               />
             </div>
             <div>
-              <Label className="mb-1.5 block text-sm">Taux d&apos;occupation hypothétique (%)</Label>
+              <Label htmlFor="exit-occupancy-rate" className="mb-1.5 block text-sm">
+                Taux d&apos;occupation hypothétique (%)
+              </Label>
               <Input
+                id="exit-occupancy-rate"
                 type="number"
                 value={profile.occupancyRatePercent ?? ""}
                 onChange={(e) => onChange("occupancyRatePercent", parseNumber(e.target.value))}
@@ -257,6 +266,7 @@ export function ExitStrategySection({
             {MINPAKU_CHECKLIST_TEMPLATE.map((item) => (
               <li key={item.id} className="flex items-center gap-2 text-sm">
                 <Checkbox
+                  aria-label={item.label}
                   checked={profile.minpakuChecklist[item.id] === true}
                   onCheckedChange={(checked) => onMinpakuItemChange(item.id, checked === true)}
                 />
@@ -274,8 +284,11 @@ export function ExitStrategySection({
             🏚️ Rénover ou 💥 démolir ?
           </p>
           <div>
-            <Label className="mb-1.5 block text-sm">Coût de démolition estimé (devis ou hypothèse, JPY)</Label>
+            <Label htmlFor="exit-demolition-cost" className="mb-1.5 block text-sm">
+              Coût de démolition estimé (devis ou hypothèse, JPY)
+            </Label>
             <Input
+              id="exit-demolition-cost"
               type="number"
               value={profile.demolitionCostJpy ?? ""}
               onChange={(e) => onChange("demolitionCostJpy", parseNumber(e.target.value))}

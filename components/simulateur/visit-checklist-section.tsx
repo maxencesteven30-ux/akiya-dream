@@ -60,6 +60,7 @@ export function VisitChecklistSection({ state, onChange }: VisitChecklistSection
                     {items.map((item) => (
                       <li key={item.id} className="flex items-start gap-3 text-sm">
                         <Checkbox
+                          aria-label={item.label}
                           checked={state[item.id] === true}
                           onCheckedChange={(checked) => onChange(item.id, checked === true)}
                           className="mt-0.5"
