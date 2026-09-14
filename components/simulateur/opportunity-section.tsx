@@ -319,6 +319,10 @@ export function OpportunitySection({
                   <p className="text-muted-foreground">
                     {formatJpy(result.priceTargets.interestingZone.minJpy)} –{" "}
                     {formatJpy(result.priceTargets.interestingZone.maxJpy)}
+                    <span className="block text-xs">
+                      soit {formatEur(jpyToEur(result.priceTargets.interestingZone.minJpy))} –{" "}
+                      {formatEur(jpyToEur(result.priceTargets.interestingZone.maxJpy))}
+                    </span>
                   </p>
                 </div>
               )}

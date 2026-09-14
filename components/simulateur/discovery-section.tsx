@@ -13,7 +13,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatJpy } from "@/lib/format";
+import { formatEur, formatJpy } from "@/lib/format";
+import { jpyToEur } from "@/lib/data";
 import type { SimulatorState } from "@/lib/types";
 import { deriveSearchProfileFromProject, type SearchProfile } from "@/lib/discovery/search-profile";
 import {
@@ -201,7 +202,7 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
 
   const priceHint = intake.priceRaw ? (() => {
     const value = parsePriceJpy(intake.priceRaw!);
-    return value !== null ? formatJpy(value) : null;
+    return value !== null ? `${formatJpy(value)} (≈ ${formatEur(jpyToEur(value))})` : null;
   })() : null;
   const landAreaHint = intake.landAreaRaw ? (() => {
     const value = parseAreaM2(intake.landAreaRaw!);
@@ -532,7 +533,9 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
                     <span aria-hidden>{VERDICT_ICONS[verdictById.get(c.id) ?? "UNKNOWN"]}</span>{" "}
                     {c.title ?? `${c.source} #${c.sourceListingId}`}
                     <span className="text-muted-foreground">
-                      {c.priceJpy !== null ? ` — ${formatJpy(c.priceJpy)}` : " — prix inconnu"}
+                      {c.priceJpy !== null
+                        ? ` — ${formatJpy(c.priceJpy)} (≈ ${formatEur(jpyToEur(c.priceJpy))})`
+                        : " — prix inconnu"}
                       {` — ${LISTING_AVAILABILITY_LABELS[c.availabilityStatus]}`}
                     </span>
                   </span>

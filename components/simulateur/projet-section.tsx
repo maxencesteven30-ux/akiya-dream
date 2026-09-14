@@ -15,7 +15,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { RegionCard } from "@/components/simulateur/region-card";
-import { computeAccompanimentFee } from "@/lib/calculations";
+import { computeAccompanimentFee, computeRenovationBudget } from "@/lib/calculations";
 import { EUR_JPY_RATE, jpyToEur } from "@/lib/data";
 import { formatEur, formatJpy } from "@/lib/format";
 import type {
@@ -28,10 +28,22 @@ import type {
 export const HOUSE_PRICE_MIN_JPY = 500_000;
 export const HOUSE_PRICE_MAX_JPY = 10_000_000;
 
+function hintAmount(jpy: number): string {
+  return `~${formatJpy(jpy)} (≈ ${formatEur(jpyToEur(jpy))})`;
+}
+
 const RENOVATION_OPTIONS: { value: RenovationLevel; title: string; hint: string }[] = [
-  { value: "leger", title: "Léger", hint: "~3 M JPY — rafraîchissement" },
-  { value: "standard", title: "Standard", hint: "~8 M JPY — rénovation complète" },
-  { value: "lourd", title: "Lourd / Kominka", hint: "~15 M JPY — restauration lourde" },
+  { value: "leger", title: "Léger", hint: `${hintAmount(computeRenovationBudget("leger"))} — rafraîchissement` },
+  {
+    value: "standard",
+    title: "Standard",
+    hint: `${hintAmount(computeRenovationBudget("standard"))} — rénovation complète`,
+  },
+  {
+    value: "lourd",
+    title: "Lourd / Kominka",
+    hint: `${hintAmount(computeRenovationBudget("lourd"))} — restauration lourde`,
+  },
 ];
 
 const ACCOMPANIMENT_OPTIONS: { value: AccompanimentLevel; title: string; hint: string }[] = [
@@ -39,12 +51,12 @@ const ACCOMPANIMENT_OPTIONS: { value: AccompanimentLevel; title: string; hint: s
   {
     value: "curation",
     title: "Service de curation",
-    hint: `~${formatJpy(computeAccompanimentFee("curation"))} — sélection de biens vérifiés`,
+    hint: `${hintAmount(computeAccompanimentFee("curation"))} — sélection de biens vérifiés`,
   },
   {
     value: "cle_en_main",
     title: "Clés en main complet",
-    hint: `~${formatJpy(computeAccompanimentFee("cle_en_main"))} — mandatement intégral`,
+    hint: `${hintAmount(computeAccompanimentFee("cle_en_main"))} — mandatement intégral`,
   },
 ];
 
@@ -114,8 +126,12 @@ export function ProjetSection({
           onValueChange={(v) => onHousePriceChange(Array.isArray(v) ? v[0] : v)}
         />
         <div className="mt-1 flex justify-between text-xs text-muted-foreground">
-          <span>{formatJpy(HOUSE_PRICE_MIN_JPY)}</span>
-          <span>{formatJpy(HOUSE_PRICE_MAX_JPY)}</span>
+          <span>
+            {formatJpy(HOUSE_PRICE_MIN_JPY)} (≈ {formatEur(jpyToEur(HOUSE_PRICE_MIN_JPY))})
+          </span>
+          <span>
+            {formatJpy(HOUSE_PRICE_MAX_JPY)} (≈ {formatEur(jpyToEur(HOUSE_PRICE_MAX_JPY))})
+          </span>
         </div>
       </div>
 

@@ -75,13 +75,33 @@ export function HistorySection({
               <tbody>
                 <tr className="border-t border-border">
                   <td className="py-1.5 text-muted-foreground">Travaux estimés</td>
-                  <td className="py-1.5 text-foreground">{formatJpy(visitComparison.before.travauxJpy)}</td>
-                  <td className="py-1.5 text-foreground">{formatJpy(visitComparison.after.travauxJpy)}</td>
+                  <td className="py-1.5 text-foreground">
+                    {formatJpy(visitComparison.before.travauxJpy)}
+                    <span className="block text-xs text-muted-foreground">
+                      ≈ {formatEur(visitComparison.before.travauxJpy / visitComparison.before.eurJpyRate)}
+                    </span>
+                  </td>
+                  <td className="py-1.5 text-foreground">
+                    {formatJpy(visitComparison.after.travauxJpy)}
+                    <span className="block text-xs text-muted-foreground">
+                      ≈ {formatEur(visitComparison.after.travauxJpy / visitComparison.after.eurJpyRate)}
+                    </span>
+                  </td>
                 </tr>
                 <tr className="border-t border-border">
                   <td className="py-1.5 text-muted-foreground">Coût total du projet</td>
-                  <td className="py-1.5 text-foreground">{formatJpy(visitComparison.before.totalProjetJpy)}</td>
-                  <td className="py-1.5 text-foreground">{formatJpy(visitComparison.after.totalProjetJpy)}</td>
+                  <td className="py-1.5 text-foreground">
+                    {formatJpy(visitComparison.before.totalProjetJpy)}
+                    <span className="block text-xs text-muted-foreground">
+                      ≈ {formatEur(visitComparison.before.totalProjetJpy / visitComparison.before.eurJpyRate)}
+                    </span>
+                  </td>
+                  <td className="py-1.5 text-foreground">
+                    {formatJpy(visitComparison.after.totalProjetJpy)}
+                    <span className="block text-xs text-muted-foreground">
+                      ≈ {formatEur(visitComparison.after.totalProjetJpy / visitComparison.after.eurJpyRate)}
+                    </span>
+                  </td>
                 </tr>
                 <tr className="border-t border-border font-medium">
                   <td className="py-1.5 text-muted-foreground">Note d&apos;opportunité</td>
@@ -150,24 +170,30 @@ export function HistorySection({
                   <ul className="space-y-1 text-foreground">
                     <li className="flex justify-between">
                       <span className="text-muted-foreground">Prix saisi</span>
-                      <span>
+                      <span className="text-right">
                         {formatJpy(entry.housePriceJpy)}
                         {previous && priceDeltaJpy !== null && priceDeltaJpy !== 0 && (
                           <span className="ml-2 text-xs text-muted-foreground">
                             {formatDelta(priceDeltaJpy, formatJpy)}
                           </span>
                         )}
+                        <span className="block text-xs text-muted-foreground">
+                          ≈ {formatEur(entry.housePriceJpy / entry.eurJpyRate)}
+                        </span>
                       </span>
                     </li>
                     <li className="flex justify-between">
                       <span className="text-muted-foreground">Travaux estimés</span>
-                      <span>
+                      <span className="text-right">
                         {formatJpy(entry.travauxJpy)}
                         {previous && travauxDeltaJpy !== null && travauxDeltaJpy !== 0 && (
                           <span className="ml-2 text-xs text-muted-foreground">
                             {formatDelta(travauxDeltaJpy, formatJpy)}
                           </span>
                         )}
+                        <span className="block text-xs text-muted-foreground">
+                          ≈ {formatEur(entry.travauxJpy / entry.eurJpyRate)}
+                        </span>
                       </span>
                     </li>
                     <li className="flex justify-between">

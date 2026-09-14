@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { TriStateSelect } from "@/components/simulateur/tri-state-select";
-import { formatJpy } from "@/lib/format";
+import { formatEur, formatJpy } from "@/lib/format";
+import { jpyToEur } from "@/lib/data";
 import type { HardConstraints, SearchProfile, SoftPreferences } from "@/lib/discovery/search-profile";
 
 // Era 9 / Phase AP — Search Profile Editor.
@@ -89,9 +90,15 @@ export function SearchProfileEditor({
             value={profile.hardConstraints.maxBudgetJpy ?? ""}
             onChange={(e) => updateHard({ maxBudgetJpy: parseNumber(e.target.value) })}
           />
+          {profile.hardConstraints.maxBudgetJpy !== null && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              soit ≈ {formatEur(jpyToEur(profile.hardConstraints.maxBudgetJpy))}
+            </p>
+          )}
           {derivedProfile.hardConstraints.maxBudgetJpy !== null && (
             <p className="mt-1 text-xs text-muted-foreground">
-              Dérivé du projet : {formatJpy(derivedProfile.hardConstraints.maxBudgetJpy)}
+              Dérivé du projet : {formatJpy(derivedProfile.hardConstraints.maxBudgetJpy)} (≈{" "}
+              {formatEur(jpyToEur(derivedProfile.hardConstraints.maxBudgetJpy))})
             </p>
           )}
         </div>

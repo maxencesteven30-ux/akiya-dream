@@ -7,6 +7,8 @@ import { Card } from "@/components/ui/card";
 import { computeMarketContext, MARKET_CONTEXT_LABELS, type MarketContext } from "@/lib/market-context";
 import { PRICE_ANOMALY_DISCLAIMER } from "@/lib/price-anomaly";
 import { computeCrossSourceContext, type CrossSourceContext } from "@/lib/cross-source-context";
+import { jpyToEur } from "@/lib/data";
+import { formatEur } from "@/lib/format";
 import type { RealityDataResult } from "@/lib/reality-data";
 import type { MlitTransaction } from "@/lib/mlit/types";
 import type { OfficialLandPricePoint } from "@/lib/mlit/land-price-types";
@@ -160,9 +162,13 @@ export function MarketContextSection({
               <p>
                 Fourchette des comparables :{" "}
                 {context.comparison.priceDispersionJpy.minJpy.toLocaleString("fr-FR")} –{" "}
-                {context.comparison.priceDispersionJpy.maxJpy.toLocaleString("fr-FR")} JPY
+                {context.comparison.priceDispersionJpy.maxJpy.toLocaleString("fr-FR")} JPY (≈{" "}
+                {formatEur(jpyToEur(context.comparison.priceDispersionJpy.minJpy))} –{" "}
+                {formatEur(jpyToEur(context.comparison.priceDispersionJpy.maxJpy))})
                 {context.comparison.medianPriceJpy !== null &&
-                  ` (médiane ${context.comparison.medianPriceJpy.toLocaleString("fr-FR")} JPY)`}
+                  ` (médiane ${context.comparison.medianPriceJpy.toLocaleString("fr-FR")} JPY, ≈ ${formatEur(
+                    jpyToEur(context.comparison.medianPriceJpy),
+                  )})`}
               </p>
             )}
             {context.comparison.oldestPeriod && context.comparison.newestPeriod && (
@@ -189,10 +195,13 @@ export function MarketContextSection({
             </p>
             {crossSource.impliedLandValueJpy !== null && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Valeur foncière implicite (calculée) : {crossSource.impliedLandValueJpy.toLocaleString("fr-FR")} JPY
+                Valeur foncière implicite (calculée) : {crossSource.impliedLandValueJpy.toLocaleString("fr-FR")}{" "}
+                JPY (≈ {formatEur(jpyToEur(crossSource.impliedLandValueJpy))})
                 {" "}
-                (médiane {crossSource.medianLandPricePerSqmJpy?.toLocaleString("fr-FR")} JPY/m² × surface du
-                terrain)
+                (médiane {crossSource.medianLandPricePerSqmJpy?.toLocaleString("fr-FR")} JPY/m²
+                {crossSource.medianLandPricePerSqmJpy != null &&
+                  ` ≈ ${formatEur(jpyToEur(crossSource.medianLandPricePerSqmJpy))}/m²`}
+                {" "}× surface du terrain)
               </p>
             )}
             <div className="mt-2 space-y-1 text-xs text-muted-foreground">

@@ -112,7 +112,7 @@ export function HiddenCostsSection({
                       <span className="block text-xs text-muted-foreground">{option.hint}</span>
                     </span>
                     <span className="shrink-0 text-xs text-muted-foreground">
-                      +{getHiddenCostMidpoint(option.costId).toLocaleString("fr-FR")} JPY
+                      +<Money jpy={getHiddenCostMidpoint(option.costId)} variant="inline" />
                     </span>
                   </Label>
                 ))}

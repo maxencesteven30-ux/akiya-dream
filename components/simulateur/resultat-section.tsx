@@ -422,8 +422,8 @@ function AnnualCostsCard({
           {formatJpy(annualCosts.coutDixAnsJpy)}
         </p>
         <p className="text-sm text-muted-foreground">
-          soit {formatEur(annualCosts.coutDixAnsEur)} — {formatJpy(annualCosts.totalAnnuelJpy)}
-          {" "}/ an
+          soit {formatEur(annualCosts.coutDixAnsEur)} — {formatJpy(annualCosts.totalAnnuelJpy)} (≈{" "}
+          {formatEur(jpyToEur(annualCosts.totalAnnuelJpy))}) / an
         </p>
       </div>
 
@@ -509,13 +509,15 @@ function ScenarioComparison({
             </p>
             {scenario.subsidiesJpy > 0 && (
               <p className="text-xs text-emerald-600">
-                − {formatJpy(scenario.subsidiesJpy)} d&apos;aides ={" "}
-                {formatJpy(scenario.netTravauxJpy)} net
+                − {formatJpy(scenario.subsidiesJpy)} (≈ {formatEur(jpyToEur(scenario.subsidiesJpy))})
+                {" "}d&apos;aides = {formatJpy(scenario.netTravauxJpy)}
+                {" "}(≈ {formatEur(jpyToEur(scenario.netTravauxJpy))}) net
               </p>
             )}
             {scenario.imprevusJpy > 0 && (
               <p className="text-xs text-destructive">
-                + {formatJpy(scenario.imprevusJpy)} d&apos;imprévus terrain
+                + {formatJpy(scenario.imprevusJpy)} (≈ {formatEur(jpyToEur(scenario.imprevusJpy))})
+                {" "}d&apos;imprévus terrain
               </p>
             )}
             <p className="text-foreground">
