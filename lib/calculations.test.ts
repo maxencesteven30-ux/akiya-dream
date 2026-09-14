@@ -442,7 +442,7 @@ describe("computeEstimatedPriceFromSurface", () => {
   });
 });
 
-describe("computeBudget avec affinage surface/ère (refinement)", () => {
+describe("computeBudget avec affinage surface (refinement)", () => {
   it("sans refinement, se comporte exactement comme avant (non-régression)", () => {
     const budget = computeBudget(3_000_000, "solo", "leger");
     expect(budget.travauxJpy).toBe(3_000_000);
@@ -450,23 +450,51 @@ describe("computeBudget avec affinage surface/ère (refinement)", () => {
     expect(budget.totalProjetJpy).toBeCloseTo(6_615_000, 6);
   });
 
-  it("avec refinement, remplace le forfait par le calcul détaillé isolation+HVAC+structurel", () => {
+  it("avec surface connue, l'enveloppe travaux devient proportionnelle à la taille (68 000 JPY/m² pour leger)", () => {
+    const budget = computeBudget(3_000_000, "solo", "leger", {
+      constructionYear: 1975,
+      surfaceM2: 80,
+    });
+    expect(budget.travauxJpy).toBe(5_440_000); // 68_000 * 80
+    expect(budget.totalProjetJpy).toBeCloseTo(3_000_000 + 615_000 + 5_440_000, 6);
+  });
+
+  it("la surface seule (sans année de construction) suffit à proportionner l'enveloppe", () => {
+    const budget = computeBudget(3_000_000, "solo", "leger", {
+      constructionYear: null,
+      surfaceM2: 80,
+    });
+    expect(budget.travauxJpy).toBe(5_440_000);
+    expect(budget.surfaceBasedRenovation).toBeNull(); // affinage informationnel non calculable sans année
+  });
+
+  it("l'affinage isolation/HVAC/sismique reste informationnel, jamais sommé dans travauxJpy", () => {
     const budget = computeBudget(3_000_000, "solo", "leger", {
       constructionYear: 1975,
       surfaceM2: 80,
     });
     expect(budget.surfaceBasedRenovation).not.toBeNull();
-    expect(budget.travauxJpy).toBe(5_600_000);
-    expect(budget.totalProjetJpy).toBeCloseTo(3_000_000 + 615_000 + 5_600_000, 6);
+    expect(budget.surfaceBasedRenovation?.totalJpy).toBe(5_600_000); // cf. computeSurfaceBasedRenovation
+    // travauxJpy (5_440_000) et surfaceBasedRenovation.totalJpy (5_600_000) sont
+    // deux chiffres différents et indépendants -- jamais confondus ni sommés.
+    expect(budget.travauxJpy).not.toBe(budget.surfaceBasedRenovation?.totalJpy);
   });
 
-  it("ne produit jamais NaN même avec une surface à zéro", () => {
+  it("une petite maison et une grande maison au même niveau de travaux n'ont plus la même enveloppe", () => {
+    const petite = computeBudget(3_000_000, "solo", "standard", { constructionYear: null, surfaceM2: 40 });
+    const grande = computeBudget(3_000_000, "solo", "standard", { constructionYear: null, surfaceM2: 400 });
+    expect(petite.travauxJpy).toBe(6_040_000); // 151_000 * 40
+    expect(grande.travauxJpy).toBe(60_400_000); // 151_000 * 400
+    expect(grande.travauxJpy).toBeGreaterThan(petite.travauxJpy * 5);
+  });
+
+  it("une surface à zéro ou négative retombe sur le forfait générique, jamais 0 JPY ni NaN", () => {
     const budget = computeBudget(3_000_000, "solo", "leger", {
       constructionYear: 1990,
       surfaceM2: 0,
     });
     expect(Number.isNaN(budget.totalProjetJpy)).toBe(false);
-    expect(budget.travauxJpy).toBe(0);
+    expect(budget.travauxJpy).toBe(3_000_000); // forfait leger, surface 0 traitée comme non exploitable
   });
 });
 
@@ -476,15 +504,15 @@ describe("computeBudgetScenarios avec refinement", () => {
     expect(scenarios[0].travauxJpy).toBe(8_000_000);
   });
 
-  it("avec refinement, applique les scénarios +0/+10/+20% sur le total détaillé", () => {
+  it("avec surface connue, applique les scénarios +0/+10/+20% sur l'enveloppe proportionnelle", () => {
     const scenarios = computeBudgetScenarios(3_000_000, "solo", "standard", {
       constructionYear: 1975,
       surfaceM2: 80,
     });
-    // base détaillée = 5_600_000 (voir test computeSurfaceBasedRenovation)
-    expect(scenarios[0].travauxJpy).toBe(5_600_000);
-    expect(scenarios[1].travauxJpy).toBeCloseTo(6_160_000, 6);
-    expect(scenarios[2].travauxJpy).toBeCloseTo(6_720_000, 6);
+    // base proportionnelle = 151_000 * 80 = 12_080_000 (plus le forfait générique)
+    expect(scenarios[0].travauxJpy).toBe(12_080_000);
+    expect(scenarios[1].travauxJpy).toBeCloseTo(13_288_000, 6);
+    expect(scenarios[2].travauxJpy).toBeCloseTo(14_496_000, 6);
   });
 });
 

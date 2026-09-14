@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
@@ -32,19 +32,28 @@ function hintAmount(jpy: number): string {
   return `~${formatJpy(jpy)} (≈ ${formatEur(jpyToEur(jpy))})`;
 }
 
-const RENOVATION_OPTIONS: { value: RenovationLevel; title: string; hint: string }[] = [
-  { value: "leger", title: "Léger", hint: `${hintAmount(computeRenovationBudget("leger"))} — rafraîchissement` },
-  {
-    value: "standard",
-    title: "Standard",
-    hint: `${hintAmount(computeRenovationBudget("standard"))} — rénovation complète`,
-  },
-  {
-    value: "lourd",
-    title: "Lourd / Kominka",
-    hint: `${hintAmount(computeRenovationBudget("lourd"))} — restauration lourde`,
-  },
-];
+function buildRenovationOptions(
+  surfaceM2: number | null,
+): { value: RenovationLevel; title: string; hint: string }[] {
+  const surfaceSuffix = surfaceM2 != null && surfaceM2 > 0 ? ` pour ${surfaceM2} m²` : "";
+  return [
+    {
+      value: "leger",
+      title: "Léger",
+      hint: `${hintAmount(computeRenovationBudget("leger", surfaceM2))}${surfaceSuffix} — rafraîchissement`,
+    },
+    {
+      value: "standard",
+      title: "Standard",
+      hint: `${hintAmount(computeRenovationBudget("standard", surfaceM2))}${surfaceSuffix} — rénovation complète`,
+    },
+    {
+      value: "lourd",
+      title: "Lourd / Kominka",
+      hint: `${hintAmount(computeRenovationBudget("lourd", surfaceM2))}${surfaceSuffix} — restauration lourde`,
+    },
+  ];
+}
 
 const ACCOMPANIMENT_OPTIONS: { value: AccompanimentLevel; title: string; hint: string }[] = [
   { value: "autonome", title: "Autonome", hint: "Agence standard, aucun accompagnement dédié" },
@@ -69,6 +78,7 @@ interface ProjetSectionProps {
   onPrefectureChange: (value: string) => void;
   renovationLevel: RenovationLevel | null;
   onRenovationLevelChange: (value: RenovationLevel) => void;
+  surfaceM2: number | null;
   accompanimentLevel: AccompanimentLevel;
   onAccompanimentLevelChange: (value: AccompanimentLevel) => void;
   needsTranslation: boolean;
@@ -84,6 +94,7 @@ export function ProjetSection({
   onPrefectureChange,
   renovationLevel,
   onRenovationLevelChange,
+  surfaceM2,
   accompanimentLevel,
   onAccompanimentLevelChange,
   needsTranslation,
@@ -91,6 +102,7 @@ export function ProjetSection({
 }: ProjetSectionProps) {
   const [showFiche, setShowFiche] = useState(false);
   const selectedRegion = regions.find((r) => r.prefecture === prefecture) ?? null;
+  const renovationOptions = useMemo(() => buildRenovationOptions(surfaceM2), [surfaceM2]);
 
   return (
     <motion.section
@@ -180,7 +192,7 @@ export function ProjetSection({
           onValueChange={(v) => onRenovationLevelChange(v as RenovationLevel)}
           className="grid gap-3 sm:grid-cols-3 sm:gap-4"
         >
-          {RENOVATION_OPTIONS.map((option) => (
+          {renovationOptions.map((option) => (
             <Label
               key={option.value}
               htmlFor={`renovation-${option.value}`}

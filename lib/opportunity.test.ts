@@ -127,10 +127,16 @@ describe("computeConfidenceLevel", () => {
 
 describe("computeOpportunityScore", () => {
   it("Test 1 — récente + bon état + prix attractif -> score élevé", () => {
+    // Surface volontairement petite : avec l'enveloppe travaux désormais
+    // proportionnelle au m² (cf. RENOVATION_COST_PER_SQM_JPY), une grande
+    // maison nécessite un budget travaux non négligeable même pour un simple
+    // rafraîchissement ("leger") -- ce test isole "récent + bon état + prix
+    // attractif", pas "grande surface", d'où une petite surface réaliste.
     const result = computeOpportunityScore(
       baseInput({
-        prixAchatJpy: 2_500_000,
-        listing: { ...EMPTY_LISTING, constructionYear: 2015, surfaceM2: 80, condition: "good" },
+        prixAchatJpy: 3_000_000,
+        renovationLevel: "leger",
+        listing: { ...EMPTY_LISTING, constructionYear: 2015, surfaceM2: 25, condition: "good" },
       }),
     );
     expect(result.score).toBeGreaterThan(7);
@@ -168,7 +174,10 @@ describe("computeOpportunityScore", () => {
     const result = computeOpportunityScore(
       baseInput({
         prixAchatJpy: 8_000_000, // 2x la médiane régionale
-        listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 60, condition: "good" },
+        // Petite surface : l'enveloppe travaux (désormais proportionnelle au
+        // m²) doit rester faible par rapport au prix pour isoler le signal
+        // "peu de travaux" du signal "prix élevé".
+        listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 8, condition: "good" },
       }),
     );
     const prix = result.subScores.find((s) => s.key === "prix")!;
@@ -391,7 +400,8 @@ describe("computeInterestingZone — zone de négociation intéressante (V2)", (
   it("retourne une plage [min, max] où le score atteint le seuil visé", () => {
     const input = baseInput({
       prixAchatJpy: 6_000_000,
-      listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 70, condition: "good" },
+      renovationLevel: "leger",
+      listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 20, condition: "good" },
     });
     const zone = computeInterestingZone(input);
     expect(zone).not.toBeNull();
@@ -406,7 +416,8 @@ describe("computeInterestingZone — zone de négociation intéressante (V2)", (
   it("ne recommande jamais un prix supérieur au prix demandé actuel", () => {
     const input = baseInput({
       prixAchatJpy: 6_000_000,
-      listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 70, condition: "good" },
+      renovationLevel: "leger",
+      listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 20, condition: "good" },
     });
     const zone = computeInterestingZone(input);
     if (zone) {
@@ -432,7 +443,8 @@ describe("findAttractivePrice — prix attractif (V2)", () => {
   it("retourne le prix actuel si le score est déjà au-dessus du seuil", () => {
     const input = baseInput({
       prixAchatJpy: 2_000_000,
-      listing: { ...EMPTY_LISTING, constructionYear: 2015, surfaceM2: 80, condition: "good" },
+      renovationLevel: "leger",
+      listing: { ...EMPTY_LISTING, constructionYear: 2015, surfaceM2: 20, condition: "good" },
     });
     expect(computeOpportunityScore(input).score).toBeGreaterThanOrEqual(7);
     expect(findAttractivePrice(input)).toBe(2_000_000);
@@ -441,7 +453,8 @@ describe("findAttractivePrice — prix attractif (V2)", () => {
   it("retourne un prix inférieur qui atteint réellement le seuil visé", () => {
     const input = baseInput({
       prixAchatJpy: 6_000_000,
-      listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 70, condition: "good" },
+      renovationLevel: "leger",
+      listing: { ...EMPTY_LISTING, constructionYear: 2010, surfaceM2: 20, condition: "good" },
     });
     const attractive = findAttractivePrice(input);
     expect(attractive).not.toBeNull();

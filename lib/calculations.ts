@@ -24,10 +24,37 @@ const ACQUISITION_TAX_RATE = 0.045;
 const SCI_SETUP_JPY = 350_000;
 const GK_SETUP_JPY = 250_000;
 
+// Forfait générique utilisé uniquement quand la surface habitable du
+// bien n'est pas encore connue (avant qu'un bien réel avec surfaceM2
+// soit renseigné) — une estimation de repli, jamais présentée comme
+// proportionnelle à la taille du bien.
 const RENOVATION_BUDGET_JPY: Record<RenovationLevel, number> = {
   leger: 3_000_000,
   standard: 8_000_000,
   lourd: 15_000_000,
+};
+
+// Coût de rénovation au m², par palier — recherche réelle documentée
+// (veille 2026-09-15) sur des fourchettes exprimées en 坪 (tsubo,
+// 1 坪 = 3,305785 m²) spécifiques aux maisons anciennes/akiya
+// (古民家再生・空き家リノベーション), pas une moyenne générique tous
+// logements confondus :
+//   - "leger" ~ 表層リフォーム (rafraîchissement de surface : peinture,
+//     revêtements, sans toucher au clos-couvert) : 15-30万円/坪,
+//     milieu 22,5万円/坪.
+//   - "standard" ~ リノベーション avec changement de plan (間取り変更を
+//     含むリノベーション) : 40-60万円/坪, milieu 50万円/坪.
+//   - "lourd" ~ rénovation complète depuis l'ossature (スケルトンからの
+//     フルリノベーション, le niveau "Kominka") : 60-90万円/坪, milieu
+//     75万円/坪.
+// Sources (comparées, pas une seule page isolée) : リショップナビ,
+// タウンライフ空き家解決, フルリノ, クロニカ — cohérentes entre elles sur
+// ces trois paliers. Conversion 万円/坪 -> 円/m² : (fourchette milieu ×
+// 10 000) / 3,305785, arrondi au millier.
+const RENOVATION_COST_PER_SQM_JPY: Record<RenovationLevel, number> = {
+  leger: 68_000,
+  standard: 151_000,
+  lourd: 227_000,
 };
 
 export function computeAgencyFee(prixAchatJpy: number): number {
@@ -129,7 +156,20 @@ export function computeMaxAffordablePriceJpy(
   return Math.floor(rawPrix / MAX_PRICE_ROUNDING_STEP_JPY) * MAX_PRICE_ROUNDING_STEP_JPY;
 }
 
-export function computeRenovationBudget(niveauTravaux: RenovationLevel): number {
+// Une petite maison entièrement à refaire et une grande maison
+// partiellement rénovée n'ont pas le même coût réel : dès que la
+// surface habitable est connue, l'enveloppe travaux devient
+// proportionnelle à la taille (RENOVATION_COST_PER_SQM_JPY), plutôt
+// qu'un forfait unique identique quelle que soit la surface. Sans
+// surface connue, le forfait générique (RENOVATION_BUDGET_JPY) reste
+// la seule estimation possible.
+export function computeRenovationBudget(
+  niveauTravaux: RenovationLevel,
+  surfaceM2?: number | null,
+): number {
+  if (surfaceM2 != null && surfaceM2 > 0) {
+    return Math.round((RENOVATION_COST_PER_SQM_JPY[niveauTravaux] * surfaceM2) / 1000) * 1000;
+  }
   return RENOVATION_BUDGET_JPY[niveauTravaux];
 }
 
@@ -213,7 +253,12 @@ export interface BudgetBreakdown {
 }
 
 export interface RenovationRefinement {
-  constructionYear: number;
+  // null si l'année de construction n'est pas connue : la proportionnalité
+  // à la surface (travauxJpy) ne dépend que de surfaceM2, seul
+  // l'affinage informationnel isolation/HVAC/sismique
+  // (surfaceBasedRenovation, par ère du bâtiment) a réellement besoin de
+  // l'année.
+  constructionYear: number | null;
   surfaceM2: number;
 }
 
@@ -232,12 +277,20 @@ export function computeBudget(
     accompanimentLevel,
     needsTranslation,
   );
-  const surfaceBasedRenovation = refinement
-    ? computeSurfaceBasedRenovation(refinement.constructionYear, refinement.surfaceM2)
-    : null;
-  const travauxJpy = surfaceBasedRenovation
-    ? surfaceBasedRenovation.totalJpy
-    : computeRenovationBudget(niveauTravaux);
+  // surfaceBasedRenovation reste une information complémentaire
+  // (mise aux normes isolation/HVAC/sismique selon l'ère du bâtiment) —
+  // elle n'a jamais remplacé le choix de niveau de travaux de
+  // l'utilisateur (léger/standard/lourd), ni les autres postes qu'un
+  // niveau "standard"/"lourd" couvre déjà (cuisine, salle de bain,
+  // sols, toiture...). L'ajouter silencieusement à travauxJpy risquait
+  // aussi un double compte pour standard/lourd (une rénovation complète
+  // au m² inclut déjà normalement l'isolation/HVAC) : affichée à part,
+  // jamais sommée automatiquement.
+  const surfaceBasedRenovation =
+    refinement?.constructionYear != null
+      ? computeSurfaceBasedRenovation(refinement.constructionYear, refinement.surfaceM2)
+      : null;
+  const travauxJpy = computeRenovationBudget(niveauTravaux, refinement?.surfaceM2);
   const imprevusJpy = computeHiddenCostsTotal(hiddenCosts);
   const totalAcquisitionJpy = prixAchatJpy + acquisitionFees.total;
   const totalProjetJpy = totalAcquisitionJpy + travauxJpy + imprevusJpy;
@@ -274,8 +327,9 @@ export interface RenovationScenarios {
 
 export function computeRenovationScenarios(
   niveauTravaux: RenovationLevel,
+  surfaceM2?: number | null,
 ): RenovationScenarios {
-  const base = computeRenovationBudget(niveauTravaux);
+  const base = computeRenovationBudget(niveauTravaux, surfaceM2);
   return {
     optimisteJpy: base * SCENARIO_MULTIPLIERS.optimiste,
     realisteJpy: base * SCENARIO_MULTIPLIERS.realiste,
@@ -311,9 +365,10 @@ export function computeBudgetScenarios(
     needsTranslation,
   );
   const totalAcquisitionJpy = prixAchatJpy + acquisitionFees.total;
-  const baseTravauxJpy = refinement
-    ? computeSurfaceBasedRenovation(refinement.constructionYear, refinement.surfaceM2).totalJpy
-    : computeRenovationBudget(niveauTravaux);
+  // Même logique que computeBudget : proportionnel à la surface quand
+  // elle est connue, jamais remplacé par le seul affinage
+  // isolation/HVAC/sismique (informational, pas sommé ici).
+  const baseTravauxJpy = computeRenovationBudget(niveauTravaux, refinement?.surfaceM2);
   const imprevusJpy = computeHiddenCostsTotal(hiddenCosts);
 
   const travauxByLabel: Record<ScenarioLabel, number> = {

@@ -78,9 +78,9 @@ export function ResultatSection({
   const ready = Boolean(profile && region && renovationLevel);
 
   const refinement = useMemo(() => {
-    if (!realListing?.constructionYear || !realListing?.surfaceM2) return null;
+    if (!realListing?.surfaceM2) return null;
     return {
-      constructionYear: realListing.constructionYear,
+      constructionYear: realListing.constructionYear ?? null,
       surfaceM2: realListing.surfaceM2,
     };
   }, [realListing]);
@@ -548,20 +548,7 @@ function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> 
     ...(budget.acquisitionFees.traduction > 0
       ? [{ label: "Traduction / interprétariat", value: budget.acquisitionFees.traduction }]
       : []),
-    ...(surfaceBased
-      ? [
-          { label: "Isolation (au m², selon l'ère du bâtiment)", value: surfaceBased.isolationJpy },
-          { label: "Climatisation / chauffage (HVAC, au m²)", value: surfaceBased.hvacJpy },
-          ...(surfaceBased.majorationStructurelleJpy > 0
-            ? [
-                {
-                  label: "Mise aux normes sismiques (structurel, PRE_1981)",
-                  value: surfaceBased.majorationStructurelleJpy,
-                },
-              ]
-            : []),
-        ]
-      : [{ label: "Travaux", value: budget.travauxJpy }]),
+    { label: "Travaux", value: budget.travauxJpy },
     ...(budget.imprevusJpy > 0
       ? [{ label: "Frais de sécurisation & imprévus terrain", value: budget.imprevusJpy }]
       : []),
@@ -572,13 +559,6 @@ function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> 
       <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
         Détail du calcul
       </p>
-      {surfaceBased && (
-        <p className="mb-3 text-xs text-muted-foreground">
-          Travaux affinés à partir de la surface habitable et de l&apos;année de construction du
-          bien réel renseigné (ère {surfaceBased.eraCode.replace(/_/g, " ")}), au lieu du forfait
-          générique par niveau.
-        </p>
-      )}
       <ul className="space-y-1.5 text-sm">
         {rows.map((row) => (
           <li key={row.label} className="flex justify-between">
@@ -591,6 +571,41 @@ function DetailBreakdown({ budget }: { budget: ReturnType<typeof computeBudget> 
           </li>
         ))}
       </ul>
+
+      {surfaceBased && (
+        <div className="mt-4 rounded-md border border-border bg-muted/30 p-3">
+          <p className="text-xs font-medium text-foreground">
+            ℹ️ Pour information — mise aux normes isolation/HVAC/sismique
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Estimée séparément à partir de la surface habitable et de l&apos;année de construction du
+            bien réel renseigné (ère {surfaceBased.eraCode.replace(/_/g, " ")}) — un coût
+            supplémentaire possible selon l&apos;étendue réelle des travaux, jamais inclus dans le
+            total ci-dessus (déjà compté ou non selon ce que couvre concrètement le niveau de travaux
+            choisi).
+          </p>
+          <ul className="mt-2 space-y-1 text-xs">
+            <li className="flex justify-between">
+              <span className="text-muted-foreground">Isolation (au m²)</span>
+              <Money jpy={surfaceBased.isolationJpy} variant="inline" className="text-foreground" />
+            </li>
+            <li className="flex justify-between">
+              <span className="text-muted-foreground">Climatisation / chauffage (HVAC, au m²)</span>
+              <Money jpy={surfaceBased.hvacJpy} variant="inline" className="text-foreground" />
+            </li>
+            {surfaceBased.majorationStructurelleJpy > 0 && (
+              <li className="flex justify-between">
+                <span className="text-muted-foreground">Mise aux normes sismiques (structurel, PRE_1981)</span>
+                <Money
+                  jpy={surfaceBased.majorationStructurelleJpy}
+                  variant="inline"
+                  className="text-foreground"
+                />
+              </li>
+            )}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

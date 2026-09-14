@@ -538,7 +538,7 @@ function computeOpportunityScoreCore(input: OpportunityInput): OpportunityCoreRe
   const { prixAchatJpy, profile, renovationLevel, region, listing } = input;
 
   const refinement =
-    listing.constructionYear !== null && listing.surfaceM2 !== null
+    listing.surfaceM2 !== null
       ? { constructionYear: listing.constructionYear, surfaceM2: listing.surfaceM2 }
       : null;
 

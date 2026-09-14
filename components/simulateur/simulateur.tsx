@@ -666,6 +666,7 @@ export function Simulateur() {
               onPrefectureChange={setPrefecture}
               renovationLevel={state.renovationLevel}
               onRenovationLevelChange={setRenovationLevel}
+              surfaceM2={state.realListing?.surfaceM2 ?? null}
               accompanimentLevel={state.accompanimentLevel}
               onAccompanimentLevelChange={setAccompanimentLevel}
               needsTranslation={state.needsTranslation}
@@ -949,9 +950,9 @@ export function Simulateur() {
                   state.housePriceJpy,
                   state.profile,
                   state.renovationLevel,
-                  state.realListing?.constructionYear && state.realListing?.surfaceM2
+                  state.realListing?.surfaceM2
                     ? {
-                        constructionYear: state.realListing.constructionYear,
+                        constructionYear: state.realListing.constructionYear ?? null,
                         surfaceM2: state.realListing.surfaceM2,
                       }
                     : null,
@@ -963,9 +964,9 @@ export function Simulateur() {
                   state.housePriceJpy,
                   state.profile,
                   state.renovationLevel,
-                  state.realListing?.constructionYear && state.realListing?.surfaceM2
+                  state.realListing?.surfaceM2
                     ? {
-                        constructionYear: state.realListing.constructionYear,
+                        constructionYear: state.realListing.constructionYear ?? null,
                         surfaceM2: state.realListing.surfaceM2,
                       }
                     : null,
