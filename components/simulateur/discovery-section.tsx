@@ -537,10 +537,20 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
                     </span>
                   </span>
                   <span className="flex shrink-0 gap-1 self-end sm:self-auto">
-                    <Button variant="ghost" size="sm" onClick={() => editCandidate(c)}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Modifier ${c.title ?? `${c.source} #${c.sourceListingId}`}`}
+                      onClick={() => editCandidate(c)}
+                    >
                       Modifier
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setCandidates((prev) => removeCandidateListing(prev, c.id))}>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Retirer ${c.title ?? `${c.source} #${c.sourceListingId}`} du pool`}
+                      onClick={() => setCandidates((prev) => removeCandidateListing(prev, c.id))}
+                    >
                       Retirer
                     </Button>
                   </span>
