@@ -527,6 +527,11 @@ export function Simulateur() {
         })
       : null;
 
+  // Un seul calcul de complétion par rendu — réutilisé ci-dessous par
+  // DecisionCenterSection et par nextActionInputForQuestions, jamais
+  // recalculé deux fois pour le même state.dueDiligence.
+  const completionSummary = computeCompletionSummary(state.dueDiligence);
+
   // Réutilisé par Ask My Project et par Akiya Passport (Phase Z) — un seul
   // assemblage de l'état "signaux" du projet, jamais deux mécanismes
   // parallèles pour la même donnée.
@@ -534,7 +539,7 @@ export function Simulateur() {
     realityGate: state.realityGate,
     landNature: state.landNature,
     dueDiligence: state.dueDiligence,
-    completion: computeCompletionSummary(state.dueDiligence),
+    completion: completionSummary,
     feasibility: historyOpportunityResult?.feasibility ?? null,
     visitStatus: computeVisitStatusFromState(state.visitChecklist),
     documentsCount: projectDocuments?.length ?? 0,
@@ -716,7 +721,7 @@ export function Simulateur() {
                   riskFlags={historyOpportunityResult.riskFlags}
                   budgetTotalJpy={historyOpportunityResult.budget.totalProjetJpy}
                   dueDiligence={state.dueDiligence}
-                  completion={computeCompletionSummary(state.dueDiligence)}
+                  completion={completionSummary}
                   visitChecklist={state.visitChecklist}
                   realityGate={state.realityGate}
                   landNature={state.landNature}
