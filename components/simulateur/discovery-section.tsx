@@ -55,6 +55,7 @@ import { computeOpportunityScore, type OpportunityResult } from "@/lib/opportuni
 import type { CityScoreResult } from "@/lib/city-score";
 import type { MarketContext } from "@/lib/market-context";
 import { MARKET_CONTEXT_LABELS } from "@/lib/market-context";
+import { findPossibleDuplicates, type DuplicateSignal } from "@/lib/discovery/duplicate-detection";
 
 // Era 9 / Phase AN — Discovery UI.
 //
@@ -84,6 +85,15 @@ const VERDICT_ICONS: Record<"PASS" | "FAIL" | "UNKNOWN", string> = {
   PASS: "✅",
   FAIL: "⛔",
   UNKNOWN: "🟠",
+};
+
+const DUPLICATE_SIGNAL_LABELS: Record<DuplicateSignal, string> = {
+  same_municipality: "même municipalité",
+  close_coordinates: "coordonnées proches (≤ 50m)",
+  same_address: "même adresse",
+  same_price: "même prix",
+  similar_surface: "surface similaire",
+  same_building_year: "même année de construction",
 };
 
 const REBUILDABILITY_HINT_LABELS: Partial<Record<RealityGateItemStatus, string>> = {
@@ -186,6 +196,8 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
     for (const item of discoveryResult.excluded) map.set(item.listing.id, "FAIL");
     return map;
   }, [discoveryResult]);
+  const possibleDuplicates = useMemo(() => findPossibleDuplicates(candidates), [candidates]);
+  const listingById = useMemo(() => new Map(candidates.map((c) => [c.id, c])), [candidates]);
 
   if (!open) {
     return (
@@ -544,6 +556,34 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
             {editingId !== null ? "Enregistrer les modifications" : "Ajouter au pool de candidats"}
           </Button>
         </div>
+
+        {possibleDuplicates.length > 0 && (
+          <div className="mt-6 rounded-md border border-amber-600/40 bg-amber-600/5 p-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-amber-800">
+              ⚠️ {possibleDuplicates.length} possible{possibleDuplicates.length > 1 ? "s" : ""} doublon
+              {possibleDuplicates.length > 1 ? "s" : ""} entre sources différentes
+            </p>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Jamais fusionnés automatiquement — à vérifier vous-même avant toute décision.
+            </p>
+            <ul className="space-y-1 text-xs">
+              {possibleDuplicates.map((pair) => {
+                const a = listingById.get(pair.listingIdA);
+                const b = listingById.get(pair.listingIdB);
+                if (!a || !b) return null;
+                return (
+                  <li key={`${pair.listingIdA}-${pair.listingIdB}`} className="text-foreground">
+                    {a.title ?? `${a.source} #${a.sourceListingId}`} ↔ {b.title ?? `${b.source} #${b.sourceListingId}`}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      — signaux communs : {pair.matchedSignals.map((s) => DUPLICATE_SIGNAL_LABELS[s]).join(", ")}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
         {candidates.length > 0 && (
           <div className="mt-6 border-t border-border pt-5">
