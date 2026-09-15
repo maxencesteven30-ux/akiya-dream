@@ -18,6 +18,13 @@ import type { PolygonHazardCategory } from "@/lib/hazard/provider";
 import { AMENITY_CATEGORY_LABELS, type AmenityCategory } from "@/lib/amenities/provider";
 import { computeCityScore, type CityScoreResult } from "@/lib/city-score";
 import type { EstatResult } from "@/lib/estat-contract";
+import { computeAveragePricePerSqm, recentQuarters, type AveragePricePerSqm } from "@/lib/mlit/price-stats";
+import { computeAverageLandPricePerSqm, type AverageLandPricePerSqm } from "@/lib/mlit/land-price-stats";
+import type { MlitTransaction } from "@/lib/mlit/types";
+import type { OfficialLandPricePoint } from "@/lib/mlit/land-price-types";
+import type { ConstructionCostData } from "@/lib/estat/construction-cost-provider";
+import { jpyToEur } from "@/lib/data";
+import { formatEur, formatJpy } from "@/lib/format";
 
 // Onglet "Ville" — vue municipalité, indépendante d'un bien précis ET
 // indépendante de la région d'investissement (curatée, 18 préfectures)
@@ -99,6 +106,11 @@ function CityExplorer({
   const [amenities, setAmenities] = useState<AmenityFetchResult[]>([]);
   const [station, setStation] = useState<StationFetchResult | null>(null);
   const [cityScore, setCityScore] = useState<CityScoreResult | null>(null);
+  const [transactionStats, setTransactionStats] = useState<AveragePricePerSqm | null>(null);
+  const [transactionPeriod, setTransactionPeriod] = useState<string | null>(null);
+  const [landPriceStats, setLandPriceStats] = useState<AverageLandPricePerSqm | null>(null);
+  const [landPriceYear, setLandPriceYear] = useState<number | null>(null);
+  const [constructionCost, setConstructionCost] = useState<ConstructionCostData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -202,6 +214,55 @@ function CityExplorer({
         setAmenities([]);
         setStation(null);
       }
+
+      // Prix moyen réel au m² (transactions XIT001 récentes) — ne
+      // nécessite que le code municipal, pas le point de centre-ville.
+      const quarters = recentQuarters(new Date(), 4);
+      const txResponses = await Promise.all(
+        quarters.map((q) =>
+          fetch(
+            `/api/mlit/transactions?municipalityCode=${selectedMunicipality.code}&year=${q.year}&quarter=${q.quarter}`,
+          ).then((r) => r.json()),
+        ),
+      );
+      const allTransactions: MlitTransaction[] = txResponses.flatMap((r) =>
+        r.status === "AVAILABLE" ? (r.data ?? []) : [],
+      );
+      setTransactionStats(computeAveragePricePerSqm(allTransactions));
+      setTransactionPeriod(
+        `${quarters[quarters.length - 1].year}T${quarters[quarters.length - 1].quarter} → ${quarters[0].year}T${quarters[0].quarter}`,
+      );
+
+      // Prix foncier officiel moyen (XPT002) — nécessite le point de
+      // centre-ville ; essaie l'année courante puis l'année précédente,
+      // les millésimes de地価公示 étant publiés avec un décalage.
+      if (point) {
+        const currentYear = new Date().getFullYear();
+        let landJson: { status: string; data?: OfficialLandPricePoint[] } = await fetch(
+          `/api/mlit/land-price?latitude=${point.latitude}&longitude=${point.longitude}&year=${currentYear}`,
+        ).then((r) => r.json());
+        let landYear = currentYear;
+        if (landJson.status !== "AVAILABLE" || !landJson.data || landJson.data.length === 0) {
+          landJson = await fetch(
+            `/api/mlit/land-price?latitude=${point.latitude}&longitude=${point.longitude}&year=${currentYear - 1}`,
+          ).then((r) => r.json());
+          landYear = currentYear - 1;
+        }
+        const landPoints = landJson.status === "AVAILABLE" ? (landJson.data ?? []) : [];
+        const landStats = computeAverageLandPricePerSqm(landPoints);
+        setLandPriceStats(landStats);
+        setLandPriceYear(landStats ? landYear : null);
+      } else {
+        setLandPriceStats(null);
+        setLandPriceYear(null);
+      }
+
+      // Coût de construction régional (référence, e-Stat) — nécessite
+      // uniquement la préfecture.
+      const constructionJson: { status: string; data?: ConstructionCostData } = await fetch(
+        `/api/estat/construction-cost?prefectureCode=${jpPrefecture.code}`,
+      ).then((r) => r.json());
+      setConstructionCost(constructionJson.status === "AVAILABLE" ? (constructionJson.data ?? null) : null);
 
       const score = computeCityScore({
         populationChangeRatePercent:
@@ -370,6 +431,71 @@ function CityExplorer({
               ) : (
                 <p className="mt-1 text-sm text-muted-foreground">Non disponible</p>
               )}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {(transactionStats || landPriceStats || constructionCost) && (
+        <Card className="mt-4 border-border p-6">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            💰 Marché immobilier & coûts de construction
+          </p>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Trois sources réelles distinctes, jamais fusionnées en un seul chiffre — chacune mesure une chose
+            différente.
+          </p>
+          <div className="space-y-3">
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs text-muted-foreground">
+                Prix moyen des transactions récentes (MLIT, {transactionPeriod})
+              </p>
+              {transactionStats ? (
+                <p className="mt-1 text-sm text-foreground">
+                  {formatJpy(transactionStats.averagePricePerSqmJpy)}/m² (≈{" "}
+                  {formatEur(jpyToEur(transactionStats.averagePricePerSqmJpy))}/m²)
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    — {transactionStats.sampleSize} transaction(s) trouvée(s)
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">Aucune transaction trouvée sur la période.</p>
+              )}
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs text-muted-foreground">
+                Prix officiel moyen du terrain{landPriceYear ? ` (${landPriceYear}, MLIT)` : " (MLIT)"}
+              </p>
+              {landPriceStats ? (
+                <p className="mt-1 text-sm text-foreground">
+                  {formatJpy(landPriceStats.averagePricePerSqmJpy)}/m² (≈{" "}
+                  {formatEur(jpyToEur(landPriceStats.averagePricePerSqmJpy))}/m²)
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    — {landPriceStats.sampleSize} point(s) officiel(s) trouvé(s) à proximité
+                  </span>
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">Aucun point officiel trouvé à proximité.</p>
+              )}
+            </div>
+            <div className="rounded-md border border-border p-3">
+              <p className="text-xs text-muted-foreground">
+                Coût de construction neuve (bois) dans la préfecture
+                {constructionCost ? ` (FY${constructionCost.fiscalYear}, e-Stat)` : " (e-Stat)"}
+              </p>
+              {constructionCost ? (
+                <p className="mt-1 text-sm text-foreground">
+                  {formatJpy(constructionCost.costPerSqmJpy)}/m² (≈{" "}
+                  {formatEur(jpyToEur(constructionCost.costPerSqmJpy))}/m²)
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-muted-foreground">Non disponible.</p>
+              )}
+              <p className="mt-1 text-xs text-muted-foreground">
+                ⚠️ Statistique de construction NEUVE (mises en chantier), pas de rénovation — donnée pour référence
+                de coût régional, jamais utilisée dans le calcul de l&apos;enveloppe travaux (forfaits nationaux
+                séparés : léger/standard/lourd).
+              </p>
             </div>
           </div>
         </Card>
