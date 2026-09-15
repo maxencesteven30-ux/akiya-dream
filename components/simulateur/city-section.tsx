@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { findPrefectureByRegionLabel, type JapanPrefecture } from "@/lib/japan-prefectures";
+import { findPrefectureByRegionLabel, JAPAN_PREFECTURES, type JapanPrefecture } from "@/lib/japan-prefectures";
 import type { MunicipalityEntry } from "@/lib/mlit/municipalities-provider";
 import { HAZARD_CATEGORY_LABELS } from "@/lib/hazard-contract";
 import type { PolygonHazardCategory } from "@/lib/hazard/provider";
@@ -19,12 +19,21 @@ import { AMENITY_CATEGORY_LABELS, type AmenityCategory } from "@/lib/amenities/p
 import { computeCityScore, type CityScoreResult } from "@/lib/city-score";
 import type { EstatResult } from "@/lib/estat-contract";
 
-// Onglet "Ville" — vue municipalité, indépendante d'un bien précis.
-// Répond au constat du 2026-09-15 : choisir une préfecture (ex.
-// Kagoshima) sans avoir encore "trouvé un bien précis" ne donnait accès
-// à AUCUNE donnée réelle (démographie, risques, services, gares), alors
-// que la plupart de ces moteurs (e-Stat en particulier) ne nécessitent
-// en réalité qu'un code municipal, jamais une adresse exacte.
+// Onglet "Ville" — vue municipalité, indépendante d'un bien précis ET
+// indépendante de la région d'investissement (curatée, 18 préfectures)
+// choisie à l'étape 2. Répond à deux constats du 2026-09-15 :
+// 1) choisir une préfecture (ex. Kagoshima) sans avoir encore "trouvé un
+//    bien précis" ne donnait accès à AUCUNE donnée réelle (démographie,
+//    risques, services, gares), alors que la plupart de ces moteurs
+//    (e-Stat en particulier) ne nécessitent en réalité qu'un code
+//    municipal, jamais une adresse exacte ;
+// 2) l'analyse ne doit pas se limiter aux 18 préfectures curatées pour
+//    l'investissement akiya (data/regions.json, qui porte des données
+//    économiques type prix médian/subvention) : elle fonctionne sur les
+//    47 préfectures du Japon, indépendamment de ce jeu de données —
+//    l'onglet a son propre sélecteur de préfecture, pré-rempli avec la
+//    région choisie à l'étape 2 quand elle existe, mais librement
+//    modifiable.
 //
 // Le point géographique utilisé ici pour les moteurs à base de
 // coordonnées (risques, services, gares) est un centre-ville
@@ -69,7 +78,13 @@ interface CitySectionProps {
 // évite les rendus en cascade d'un setState synchrone dans un effet, et
 // garantit qu'aucun état d'une préfecture précédente ne survit au
 // changement.
-function CityExplorer({ jpPrefecture, regionLabel }: { jpPrefecture: JapanPrefecture; regionLabel: string }) {
+function CityExplorer({
+  jpPrefecture,
+  onChangePrefecture,
+}: {
+  jpPrefecture: JapanPrefecture;
+  onChangePrefecture: (code: string | null) => void;
+}) {
   const [municipalities, setMunicipalities] = useState<MunicipalityEntry[]>([]);
   const [loadingMunicipalities, setLoadingMunicipalities] = useState(true);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
@@ -222,9 +237,24 @@ function CityExplorer({ jpPrefecture, regionLabel }: { jpPrefecture: JapanPrefec
       </p>
 
       <Card className="border-border p-6">
-        <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+        <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <p className="mb-2 text-xs text-muted-foreground">Commune de {regionLabel.replace(/_/g, " ")}</p>
+            <p className="mb-2 text-xs text-muted-foreground">Préfecture (47 disponibles)</p>
+            <Select value={jpPrefecture.code} onValueChange={onChangePrefecture}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {JAPAN_PREFECTURES.map((p) => (
+                  <SelectItem key={p.code} value={p.code}>
+                    {p.nameJa} ({p.label})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <p className="mb-2 text-xs text-muted-foreground">Commune</p>
             <Select
               value={selectedCode ?? ""}
               onValueChange={(v) => setSelectedCode(v)}
@@ -244,11 +274,11 @@ function CityExplorer({ jpPrefecture, regionLabel }: { jpPrefecture: JapanPrefec
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end">
-            <Button onClick={handleAnalyze} disabled={!selectedMunicipality || loadingAnalysis}>
-              {loadingAnalysis ? "Analyse..." : "🔍 Analyser la ville"}
-            </Button>
-          </div>
+        </div>
+        <div className="mt-4">
+          <Button onClick={handleAnalyze} disabled={!selectedMunicipality || loadingAnalysis}>
+            {loadingAnalysis ? "Analyse..." : "🔍 Analyser la ville"}
+          </Button>
         </div>
 
         {analysisError && (
@@ -418,21 +448,56 @@ function CityExplorer({ jpPrefecture, regionLabel }: { jpPrefecture: JapanPrefec
   );
 }
 
+// L'onglet a son propre choix de préfecture (les 47), indépendant de la
+// région d'investissement curatée choisie à l'étape 2 (`prefecture`,
+// limitée aux 18 régions de data/regions.json) — pré-rempli avec elle
+// quand elle correspond à une préfecture réelle connue, mais librement
+// modifiable ensuite : explorer une ville ne doit pas dépendre d'avoir
+// déjà choisi une région d'investissement, ni s'y limiter.
 export function CitySection({ prefecture }: CitySectionProps) {
-  const jpPrefecture = findPrefectureByRegionLabel(prefecture ?? "");
+  const suggestedCode = findPrefectureByRegionLabel(prefecture ?? "")?.code ?? null;
+  const [selectedCode, setSelectedCode] = useState<string | null>(suggestedCode);
 
-  if (!prefecture || !jpPrefecture) {
+  // Pattern React officiel pour ajuster un état dérivé d'une prop qui
+  // change (https://react.dev/learn/you-might-not-need-an-effect) : un
+  // setState conditionnel pendant le rendu, jamais dans un effet — évite
+  // le rendu superflu d'un effet après coup tout en ne réinitialisant le
+  // choix de préfecture QUE lorsque la région d'étape 2 change vraiment
+  // (jamais quand l'utilisateur a choisi une autre préfecture ici).
+  const [lastSuggestedCode, setLastSuggestedCode] = useState(suggestedCode);
+  if (suggestedCode !== lastSuggestedCode) {
+    setLastSuggestedCode(suggestedCode);
+    setSelectedCode(suggestedCode);
+  }
+
+  const jpPrefecture = JAPAN_PREFECTURES.find((p) => p.code === selectedCode) ?? null;
+
+  if (!jpPrefecture) {
     return (
       <motion.section initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         <h2 className="mb-1 text-sm font-medium uppercase tracking-wide text-muted-foreground">🏙️ La ville</h2>
-        <p className="text-sm text-muted-foreground">
-          {prefecture
-            ? "Liste des communes indisponible pour cette région (préfecture non identifiée)."
-            : "Choisissez d'abord une région à l'étape 2 pour explorer une ville."}
+        <p className="mb-4 text-sm text-muted-foreground">
+          Analysez n&apos;importe quelle commune du Japon — démographie, risques naturels, services de proximité et
+          gares — sans avoir besoin d&apos;avoir déjà trouvé un bien précis.
         </p>
+        <Card className="border-border p-6">
+          <p className="mb-2 text-xs text-muted-foreground">Préfecture (47 disponibles)</p>
+          <Select value="" onValueChange={setSelectedCode}>
+            <SelectTrigger>
+              <SelectValue placeholder="Choisir une préfecture" />
+            </SelectTrigger>
+            <SelectContent>
+              {JAPAN_PREFECTURES.map((p) => (
+                <SelectItem key={p.code} value={p.code}>
+                  {p.nameJa} ({p.label})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Card>
       </motion.section>
     );
   }
 
-  return <CityExplorer key={jpPrefecture.code} jpPrefecture={jpPrefecture} regionLabel={prefecture} />;
+  return <CityExplorer key={jpPrefecture.code} jpPrefecture={jpPrefecture} onChangePrefecture={setSelectedCode} />;
 }

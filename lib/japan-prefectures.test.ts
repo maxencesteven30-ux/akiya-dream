@@ -37,4 +37,19 @@ describe("findPrefectureByRegionLabel", () => {
       expect(code).toMatch(/^\d{2}$/);
     }
   });
+
+  it("couvre les 47 préfectures du Japon, codes 01 à 47", () => {
+    expect(JAPAN_PREFECTURES).toHaveLength(47);
+    const codes = JAPAN_PREFECTURES.map((p) => p.code).sort();
+    const expected = Array.from({ length: 47 }, (_, i) => String(i + 1).padStart(2, "0"));
+    expect(codes).toEqual(expected);
+  });
+
+  it("chaque préfecture a un nom japonais unique et non vide", () => {
+    const names = JAPAN_PREFECTURES.map((p) => p.nameJa);
+    expect(new Set(names).size).toBe(names.length);
+    for (const name of names) {
+      expect(name.length).toBeGreaterThan(0);
+    }
+  });
 });
