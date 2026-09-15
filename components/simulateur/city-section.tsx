@@ -443,7 +443,8 @@ function CityExplorer({
           </p>
           <p className="mb-3 text-xs text-muted-foreground">
             Trois sources réelles distinctes, jamais fusionnées en un seul chiffre — chacune mesure une chose
-            différente.
+            différente. Aucune ne porte spécifiquement sur les akiya : MLIT et e-Stat ne distinguent pas les biens
+            abandonnés dans leurs statistiques, ces chiffres décrivent le marché immobilier général de la commune.
           </p>
           <div className="space-y-3">
             <div className="rounded-md border border-border p-3">
@@ -461,6 +462,14 @@ function CityExplorer({
               ) : (
                 <p className="mt-1 text-sm text-muted-foreground">Aucune transaction trouvée sur la période.</p>
               )}
+              <p className="mt-2 rounded border border-amber-600/40 bg-amber-600/10 p-2 text-xs text-amber-800">
+                ⚠️⚠️ (CE N&apos;EST PAS UN PRIX D&apos;AKIYA) — MLIT ne distingue pas les maisons abandonnées dans ses
+                transactions : cette moyenne mélange TOUTES les ventes immobilières de la commune (maisons neuves,
+                appartements, terrains à bâtir, biens en excellent état...). La plupart de ces ventes concernent des
+                biens habitables ordinaires, pas des akiya — un akiya réel se négocie très généralement bien en
+                dessous de cette moyenne. À utiliser uniquement comme repère de marché général de la commune, jamais
+                comme estimation du prix d&apos;un akiya.
+              </p>
             </div>
             <div className="rounded-md border border-border p-3">
               <p className="text-xs text-muted-foreground">
@@ -477,6 +486,10 @@ function CityExplorer({
               ) : (
                 <p className="mt-1 text-sm text-muted-foreground">Aucun point officiel trouvé à proximité.</p>
               )}
+              <p className="mt-2 text-xs text-muted-foreground">
+                ⚠️ Prix du TERRAIN NU officiel (hors bâti), pas non plus une estimation d&apos;akiya — un akiya inclut
+                une maison souvent sans valeur marchande propre, parfois même un coût de démolition à déduire.
+              </p>
             </div>
             <div className="rounded-md border border-border p-3">
               <p className="text-xs text-muted-foreground">
