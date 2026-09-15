@@ -2,9 +2,20 @@ import { describe, expect, it } from "vitest";
 import { REALITY_GATE_TEMPLATE, RECONSTRUCTION_ITEM_ID } from "@/lib/reality-gate";
 import { createEmptyChecklist, computeCompletionSummary } from "@/lib/due-diligence";
 import type { NextActionInput } from "@/lib/next-best-action";
-import { classifyFieldProvenance, computeEvidenceGraph, explainCrossSourceContext, explainSignal } from "@/lib/evidence-graph";
+import {
+  classifyFieldProvenance,
+  computeEvidenceGraph,
+  explainCrossSourceContext,
+  explainListingEvaluation,
+  explainSignal,
+} from "@/lib/evidence-graph";
 import type { CrossSourceContext } from "@/lib/cross-source-context";
 import type { RealityGateState } from "@/lib/types";
+import { evaluateHardConstraints } from "@/lib/discovery/hard-constraint-engine";
+import { scoreSoftPreferences } from "@/lib/discovery/soft-preference-ranking";
+import { createEmptySearchProfile } from "@/lib/discovery/search-profile";
+import { createEmptyPropertyListing } from "@/lib/discovery/property-listing";
+import type { DiscoveryResultItem } from "@/lib/discovery/discovery-orchestrator";
 
 function cleanRealityGate(): RealityGateState {
   return Object.fromEntries(REALITY_GATE_TEMPLATE.map((item) => [item.id, "verifie"]));
@@ -130,5 +141,78 @@ describe("explainCrossSourceContext", () => {
   it("n'inclut pas les champs fonciers quand landPriceAvailable est faux", () => {
     const node = explainCrossSourceContext({ ...context, landPriceAvailable: false });
     expect(node.facts.map((f) => f.fieldPath)).not.toContain("landPricePoints");
+  });
+});
+
+describe("explainListingEvaluation", () => {
+  function buildItem(
+    profileOverrides: Partial<ReturnType<typeof createEmptySearchProfile>>,
+    listingOverrides: object,
+  ) {
+    const profile = { ...createEmptySearchProfile(), ...profileOverrides };
+    const listing = { ...createEmptyPropertyListing("id1", "test", "src1"), ...listingOverrides };
+    return {
+      listing,
+      hardConstraintEvaluation: evaluateHardConstraints(profile.hardConstraints, listing),
+      softPreferenceScore: scoreSoftPreferences(profile.softPreferences, listing),
+    } satisfies DiscoveryResultItem;
+  }
+
+  it("verdict PASS quand tous les criteres actifs sont satisfaits, aucun champ inconnu", () => {
+    const item = buildItem(
+      { hardConstraints: { ...createEmptySearchProfile().hardConstraints, maxBudgetJpy: 5_000_000 } },
+      { priceJpy: 3_000_000 },
+    );
+    const node = explainListingEvaluation(item);
+    expect(node.verdict).toBe("PASS");
+    expect(node.unknownFields).toHaveLength(0);
+    expect(node.facts.length).toBeGreaterThan(0);
+  });
+
+  it("verdict FAIL quand un critere eliminatoire echoue, jamais transforme en UNKNOWN", () => {
+    const item = buildItem(
+      { hardConstraints: { ...createEmptySearchProfile().hardConstraints, maxBudgetJpy: 1_000_000 } },
+      { priceJpy: 3_000_000 },
+    );
+    const node = explainListingEvaluation(item);
+    expect(node.verdict).toBe("FAIL");
+    expect(node.reasonMessage).toContain("Budget maximum");
+  });
+
+  it("un critere actif dont la donnee est absente reste dans unknownFields, jamais un fait affirme", () => {
+    const item = buildItem(
+      { hardConstraints: { ...createEmptySearchProfile().hardConstraints, maxBudgetJpy: 3_000_000 } },
+      { priceJpy: null },
+    );
+    const node = explainListingEvaluation(item);
+    expect(node.verdict).toBe("UNKNOWN");
+    expect(node.unknownFields).toContain("listing.maxBudgetJpy");
+    expect(node.nextAction).toContain("maxBudgetJpy");
+  });
+
+  it("exclut les criteres non actifs (NOT_APPLICABLE/not_active) des faits et des inconnues", () => {
+    const item = buildItem({}, {});
+    const node = explainListingEvaluation(item);
+    expect(node.facts).toHaveLength(0);
+    expect(node.unknownFields).toHaveLength(0);
+    expect(node.reasonMessage).toContain("Aucun critère actif");
+  });
+
+  it("chaque fait de listing est classe EXTERNAL_FACT (donnee externe non verifiee par Akiya Dream)", () => {
+    const item = buildItem(
+      { hardConstraints: { ...createEmptySearchProfile().hardConstraints, maxBudgetJpy: 5_000_000 } },
+      { priceJpy: 3_000_000 },
+    );
+    const node = explainListingEvaluation(item);
+    expect(node.facts.every((f) => f.provenance === "EXTERNAL_FACT")).toBe(true);
+  });
+
+  it("n'invoque aucun recalcul : le verdict correspond exactement a hardConstraintEvaluation.verdict deja calcule", () => {
+    const item = buildItem(
+      { hardConstraints: { ...createEmptySearchProfile().hardConstraints, maxBudgetJpy: 5_000_000 } },
+      { priceJpy: 3_000_000 },
+    );
+    const node = explainListingEvaluation(item);
+    expect(node.verdict).toBe(item.hardConstraintEvaluation.verdict);
   });
 });

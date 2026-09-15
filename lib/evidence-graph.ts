@@ -1,5 +1,6 @@
 import { buildNextActionSignals, type NextActionInput, type PrioritizedAction } from "@/lib/next-best-action";
 import type { CrossSourceContext } from "@/lib/cross-source-context";
+import type { DiscoveryResultItem } from "@/lib/discovery/discovery-orchestrator";
 
 // Phase AH — Evidence Graph / Decision Trace.
 //
@@ -59,6 +60,13 @@ const FIELD_PROVENANCE_RULES: Array<[prefix: string, label: ProvenanceLabel]> = 
   ["medianLandPricePerSqmJpy", "DERIVED_VALUE"],
   ["askingPriceJpy", "USER_INPUT"],
   ["landM2", "USER_INPUT"],
+  // Era 9 (suite) — un champ d'un PropertyListing découvert vient
+  // toujours d'une source externe (annonce, registre) jamais vérifiée
+  // par Akiya Dream elle-même — distinct d'un EXTERNAL_FACT MLIT/e-Stat
+  // (source officielle gouvernementale) précisément parce que sa
+  // fiabilité n'est pas garantie de la même façon ; conservé sous le
+  // même label faute d'un niveau de confiance dédié pour l'instant.
+  ["listing.", "EXTERNAL_FACT"],
 ];
 
 export function classifyFieldProvenance(fieldPath: string): ProvenanceLabel {
@@ -133,5 +141,61 @@ export function explainCrossSourceContext(context: CrossSourceContext): Evidence
     facts,
     unknownFields: context.unknowns,
     nextAction: context.narrative[context.narrative.length - 1] ?? "",
+  };
+}
+
+// Era 9 (suite) — Discovery Engine : "pourquoi ce bien ?" (section 27 de
+// la mission). Enveloppe exactement ce que evaluateHardConstraints (AJ)
+// et scoreSoftPreferences (AK) ont déjà établi, sur le même modèle que
+// explainCrossSourceContext ci-dessus — aucun recalcul, aucun moteur
+// explicatif parallèle. Seuls les critères ACTIFS (NOT_APPLICABLE / not_active
+// exclus) apparaissent : un critère jamais demandé par l'utilisateur n'est
+// ni un fait ni une inconnue pertinente ici.
+export function explainListingEvaluation(item: DiscoveryResultItem): EvidenceNode {
+  const activeHardChecks = item.hardConstraintEvaluation.checks.filter((c) => c.status !== "NOT_APPLICABLE");
+  const activeSoftMatches = item.softPreferenceScore.matches.filter((m) => m.status !== "not_active");
+
+  const facts: EvidenceFact[] = [
+    ...activeHardChecks.map((c) => ({
+      fieldPath: `listing.${c.criterionId}`,
+      provenance: classifyFieldProvenance(`listing.${c.criterionId}`),
+    })),
+    ...activeSoftMatches.map((m) => ({
+      fieldPath: `listing.${m.criterionId}`,
+      provenance: classifyFieldProvenance(`listing.${m.criterionId}`),
+    })),
+  ];
+
+  const unknownFields = [
+    ...activeHardChecks.filter((c) => c.status === "UNKNOWN").map((c) => `listing.${c.criterionId}`),
+    ...activeSoftMatches.filter((m) => m.status === "unknown").map((m) => `listing.${m.criterionId}`),
+  ];
+
+  const passedHard = activeHardChecks.filter((c) => c.status === "PASS").map((c) => c.label);
+  const failedHard = activeHardChecks.filter((c) => c.status === "FAIL").map((c) => c.label);
+  const matchedSoft = activeSoftMatches.filter((m) => m.status === "matched").map((m) => m.label);
+  const unmatchedSoft = activeSoftMatches.filter((m) => m.status === "unmatched").map((m) => m.label);
+
+  const reasonParts: string[] = [];
+  if (passedHard.length > 0) reasonParts.push(`Critères éliminatoires respectés : ${passedHard.join(", ")}.`);
+  if (failedHard.length > 0) reasonParts.push(`Critères éliminatoires non respectés : ${failedHard.join(", ")}.`);
+  if (matchedSoft.length > 0) reasonParts.push(`Préférences satisfaites : ${matchedSoft.join(", ")}.`);
+  if (unmatchedSoft.length > 0) reasonParts.push(`Préférences non satisfaites : ${unmatchedSoft.join(", ")}.`);
+  if (reasonParts.length === 0) reasonParts.push("Aucun critère actif à évaluer pour ce bien.");
+
+  const nextAction =
+    unknownFields.length > 0
+      ? `À vérifier avant toute décision : ${unknownFields.map((f) => f.replace("listing.", "")).join(", ")}.`
+      : item.hardConstraintEvaluation.verdict === "FAIL"
+        ? "Ce bien ne correspond pas à un ou plusieurs critères éliminatoires de votre projet."
+        : "Aucune vérification supplémentaire requise pour la correspondance à votre profil de recherche.";
+
+  return {
+    verdict: item.hardConstraintEvaluation.verdict,
+    reasonMessage: reasonParts.join(" "),
+    ruleId: "discovery_listing_match",
+    facts,
+    unknownFields,
+    nextAction,
   };
 }
