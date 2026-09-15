@@ -227,7 +227,7 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
     return (
       <div>
         <Button variant="outline" onClick={() => setOpen(true)}>
-          Je n&apos;ai pas encore trouvé de bien — m&apos;aider à chercher
+          🏠 Trouver mon Akiya — je n&apos;ai pas encore trouvé de bien
         </Button>
       </div>
     );
@@ -301,7 +301,8 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
       <Card className="border-border p-6 sm:p-8">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm uppercase tracking-wide text-muted-foreground">
+            <p className="text-base font-medium text-foreground">🏠 Trouver mon Akiya</p>
+            <p className="mt-1 text-sm uppercase tracking-wide text-muted-foreground">
               Recherche d&apos;akiya (saisie assistée)
             </p>
             <p className="mt-1 text-xs text-muted-foreground">
@@ -656,11 +657,15 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
 
         {candidates.length > 0 && (
           <div className="mt-6 border-t border-border pt-5">
+            <p className="mb-1 text-sm font-medium text-foreground">
+              {candidates.length} annonce{candidates.length > 1 ? "s" : ""} trouvée{candidates.length > 1 ? "s" : ""}
+            </p>
             <p className="mb-3 text-sm text-muted-foreground">
-              {discoveryResult.eligible.length} éligible{discoveryResult.eligible.length > 1 ? "s" : ""} ·{" "}
-              {discoveryResult.needsReview.length} à vérifier ·{" "}
-              {discoveryResult.excluded.length} exclu{discoveryResult.excluded.length > 1 ? "s" : ""} sur{" "}
-              {candidates.length} candidat{candidates.length > 1 ? "s" : ""}
+              {discoveryResult.eligible.length} correspond{discoveryResult.eligible.length > 1 ? "ent" : ""} fortement
+              (éligible{discoveryResult.eligible.length > 1 ? "s" : ""}) ·{" "}
+              {discoveryResult.needsReview.length} nécessite{discoveryResult.needsReview.length > 1 ? "nt" : ""} des
+              vérifications ·{" "}
+              {discoveryResult.excluded.length} incompatible{discoveryResult.excluded.length > 1 ? "s" : ""}
             </p>
             <div className="grid gap-4 sm:grid-cols-3">
               <DiscoveryResultColumn
