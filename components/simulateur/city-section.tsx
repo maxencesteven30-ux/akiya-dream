@@ -7,10 +7,13 @@ import { Card } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { groupMunicipalitiesByType, MUNICIPALITY_TYPE_LABELS } from "@/lib/mlit/municipality-type";
 import { findPrefectureByRegionLabel, JAPAN_PREFECTURES, type JapanPrefecture } from "@/lib/japan-prefectures";
 import type { MunicipalityEntry } from "@/lib/mlit/municipalities-provider";
 import { HAZARD_CATEGORY_LABELS } from "@/lib/hazard-contract";
@@ -144,6 +147,7 @@ function CityExplorer({
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
 
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
+  const [analysisStep, setAnalysisStep] = useState<string | null>(null);
   const [analysisError, setAnalysisError] = useState(false);
   const [centerPoint, setCenterPoint] = useState<{ latitude: number; longitude: number } | null>(null);
   const [population, setPopulation] = useState<EstatResult | null>(null);
@@ -178,12 +182,14 @@ function CityExplorer({
   }, [jpPrefecture.code]);
 
   const selectedMunicipality = municipalities.find((m) => m.code === selectedCode) ?? null;
+  const groupedMunicipalities = useMemo(() => groupMunicipalitiesByType(municipalities), [municipalities]);
 
   const handleAnalyze = async () => {
     if (!selectedMunicipality) return;
     setLoadingAnalysis(true);
     setAnalysisError(false);
     try {
+      setAnalysisStep("Résolution du centre-ville (GSI)...");
       const centerRes = await fetch(
         `/api/geocoding/municipality-center?prefectureNameJa=${encodeURIComponent(jpPrefecture.nameJa)}&municipalityNameJa=${encodeURIComponent(selectedMunicipality.nameJa)}`,
       );
@@ -191,6 +197,7 @@ function CityExplorer({
       const point = centerData.point;
       setCenterPoint(point);
 
+      setAnalysisStep("Démographie (e-Stat)...");
       const [popRes, hhRes, rateRes] = await Promise.all([
         fetch(`/api/estat?municipalityCode=${selectedMunicipality.code}&indicator=population`),
         fetch(`/api/estat?municipalityCode=${selectedMunicipality.code}&indicator=households`),
@@ -208,6 +215,7 @@ function CityExplorer({
       let stationResult: StationFetchResult | null = null;
 
       if (point) {
+        setAnalysisStep("Risques naturels (MLIT)...");
         const hazardResponses = await Promise.all(
           HAZARD_CATEGORIES.map((category) =>
             fetch(`/api/hazard?category=${category}&latitude=${point.latitude}&longitude=${point.longitude}`).then(
@@ -221,6 +229,7 @@ function CityExplorer({
         }));
         setHazards(hazardResults);
 
+        setAnalysisStep("Services de proximité (MLIT)...");
         const amenityResponses = await Promise.all(
           AMENITY_CATEGORIES.map((category) =>
             fetch(`/api/amenities?category=${category}&latitude=${point.latitude}&longitude=${point.longitude}`).then(
@@ -240,6 +249,7 @@ function CityExplorer({
         });
         setAmenities(amenityResults);
 
+        setAnalysisStep("Gare la plus proche (MLIT)...");
         const stationRes = await fetch(`/api/stations?latitude=${point.latitude}&longitude=${point.longitude}`).then(
           (r) => r.json(),
         );
@@ -264,6 +274,7 @@ function CityExplorer({
 
       // Prix moyen réel au m² (transactions XIT001 récentes) — ne
       // nécessite que le code municipal, pas le point de centre-ville.
+      setAnalysisStep("Prix des transactions récentes (MLIT)...");
       const quarters = recentQuarters(new Date(), 4);
       const txResponses = await Promise.all(
         quarters.map((q) =>
@@ -284,6 +295,7 @@ function CityExplorer({
       // centre-ville ; essaie l'année courante puis l'année précédente,
       // les millésimes de地価公示 étant publiés avec un décalage.
       if (point) {
+        setAnalysisStep("Prix officiel du terrain (MLIT)...");
         const currentYear = new Date().getFullYear();
         let landJson: { status: string; data?: OfficialLandPricePoint[] } = await fetch(
           `/api/mlit/land-price?latitude=${point.latitude}&longitude=${point.longitude}&year=${currentYear}`,
@@ -306,6 +318,7 @@ function CityExplorer({
 
       // Coût de construction régional (référence, e-Stat) — nécessite
       // uniquement la préfecture.
+      setAnalysisStep("Coût de construction régional (e-Stat)...");
       const constructionJson: { status: string; data?: ConstructionCostData } = await fetch(
         `/api/estat/construction-cost?prefectureCode=${jpPrefecture.code}`,
       ).then((r) => r.json());
@@ -314,6 +327,7 @@ function CityExplorer({
       setAnalysisError(true);
     } finally {
       setLoadingAnalysis(false);
+      setAnalysisStep(null);
     }
   };
 
@@ -383,7 +397,18 @@ function CityExplorer({
             </Select>
           </div>
           <div>
-            <p className="mb-2 text-xs text-muted-foreground">Commune</p>
+            <p className="mb-2 text-xs text-muted-foreground">
+              Commune
+              {groupedMunicipalities.length > 0 && (
+                <span className="ml-1">
+                  (
+                  {groupedMunicipalities
+                    .map((g) => `${g.entries.length} ${MUNICIPALITY_TYPE_LABELS[g.type].split(" ")[0].toLowerCase()}`)
+                    .join(", ")}
+                  )
+                </span>
+              )}
+            </p>
             <Select
               value={selectedCode ?? ""}
               onValueChange={(v) => setSelectedCode(v)}
@@ -395,19 +420,27 @@ function CityExplorer({
                 />
               </SelectTrigger>
               <SelectContent>
-                {municipalities.map((m) => (
-                  <SelectItem key={m.code} value={m.code}>
-                    {m.nameJa} ({m.code})
-                  </SelectItem>
+                {groupedMunicipalities.map((group) => (
+                  <SelectGroup key={group.type}>
+                    <SelectLabel>{MUNICIPALITY_TYPE_LABELS[group.type]}</SelectLabel>
+                    {group.entries.map((m) => (
+                      <SelectItem key={m.code} value={m.code}>
+                        {m.nameJa} ({m.code})
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>
           </div>
         </div>
-        <div className="mt-4 flex flex-wrap gap-2">
+        <div className="mt-4 flex flex-wrap items-center gap-2">
           <Button onClick={handleAnalyze} disabled={!selectedMunicipality || loadingAnalysis}>
             {loadingAnalysis ? "Analyse..." : "🔍 Analyser la ville"}
           </Button>
+          {loadingAnalysis && analysisStep && (
+            <span className="text-xs text-muted-foreground">{analysisStep}</span>
+          )}
           {onUseCity && (
             <Button
               variant="outline"

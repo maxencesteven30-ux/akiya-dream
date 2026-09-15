@@ -382,6 +382,14 @@ export function Simulateur() {
     setState((prev) => ({ ...prev, reserveSecuriteEur }));
   const setRealListing = (realListing: RealListing | null) =>
     setState((prev) => ({ ...prev, realListing }));
+  // Quelqu'un qui utilise le quiz "Trouver ma région" ne sait
+  // typiquement pas encore où chercher : après un choix, on l'amène
+  // directement à l'onglet Ville plutôt que de le laisser deviner qu'il
+  // doit défiler jusqu'à la section plus bas.
+  const handleSelectRegionFromFinder = (prefectureLabel: string) => {
+    setPrefecture(prefectureLabel);
+    document.getElementById("city-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
   // Bridge depuis l'onglet Ville ("Utiliser cette commune pour mon
   // projet") : fusionne ville + code municipal dans le bien existant
   // s'il y en a un (ne détruit jamais un bien déjà en cours de saisie),
@@ -672,7 +680,7 @@ export function Simulateur() {
               regionAttributes={regionAttributes}
               capitalDisponibleEur={state.capitalDisponibleEur}
               reserveSecuriteEur={state.reserveSecuriteEur}
-              onSelectRegion={setPrefecture}
+              onSelectRegion={handleSelectRegionFromFinder}
             />
             <JapanMap
               regions={regions}
@@ -694,7 +702,9 @@ export function Simulateur() {
               needsTranslation={state.needsTranslation}
               onNeedsTranslationChange={setNeedsTranslation}
             />
-            <CitySection prefecture={state.prefecture} onUseCity={useCityForProject} />
+            <div id="city-section">
+              <CitySection prefecture={state.prefecture} onUseCity={useCityForProject} />
+            </div>
             <DiscoverySection simulatorState={state} />
             <RealListingSection
               realListing={state.realListing}
