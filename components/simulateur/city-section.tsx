@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -16,7 +16,14 @@ import type { MunicipalityEntry } from "@/lib/mlit/municipalities-provider";
 import { HAZARD_CATEGORY_LABELS } from "@/lib/hazard-contract";
 import type { PolygonHazardCategory } from "@/lib/hazard/provider";
 import { AMENITY_CATEGORY_LABELS, type AmenityCategory } from "@/lib/amenities/provider";
-import { computeCityScore, type CityScoreResult } from "@/lib/city-score";
+import {
+  computeCityScore,
+  type CityScoreAxis,
+  type CityScoreAxisKey,
+  type CityScoreCategory,
+  type CityScorePriorities,
+  type CityScorePriority,
+} from "@/lib/city-score";
 import type { EstatResult } from "@/lib/estat-contract";
 import { computeAveragePricePerSqm, recentQuarters, type AveragePricePerSqm } from "@/lib/mlit/price-stats";
 import { computeAverageLandPricePerSqm, type AverageLandPricePerSqm } from "@/lib/mlit/land-price-stats";
@@ -76,6 +83,26 @@ function formatDistance(meters: number): string {
   return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
 }
 
+const PRIORITY_AXIS_LABELS: Record<CityScoreAxisKey, string> = {
+  demographie: "Démographie",
+  risques: "Risques naturels",
+  services: "Services de proximité",
+  gare: "Gare & réseau ferré",
+};
+
+// Épinglé pour comparaison — vit dans CitySection (jamais dans
+// CityExplorer, qui est remonté à chaque changement de préfecture) afin
+// de pouvoir comparer des communes de préfectures DIFFÉRENTES entre
+// elles, pas seulement au sein d'une même préfecture.
+export interface PinnedCity {
+  prefectureLabel: string;
+  municipalityCode: string;
+  municipalityName: string;
+  score: number | null;
+  category: CityScoreCategory | null;
+  axes: CityScoreAxis[];
+}
+
 interface CitySectionProps {
   prefecture: string | null;
 }
@@ -88,9 +115,13 @@ interface CitySectionProps {
 function CityExplorer({
   jpPrefecture,
   onChangePrefecture,
+  pinnedCodes,
+  onTogglePin,
 }: {
   jpPrefecture: JapanPrefecture;
   onChangePrefecture: (code: string | null) => void;
+  pinnedCodes: Set<string>;
+  onTogglePin: (snapshot: PinnedCity) => void;
 }) {
   const [municipalities, setMunicipalities] = useState<MunicipalityEntry[]>([]);
   const [loadingMunicipalities, setLoadingMunicipalities] = useState(true);
@@ -105,7 +136,7 @@ function CityExplorer({
   const [hazards, setHazards] = useState<HazardFetchResult[]>([]);
   const [amenities, setAmenities] = useState<AmenityFetchResult[]>([]);
   const [station, setStation] = useState<StationFetchResult | null>(null);
-  const [cityScore, setCityScore] = useState<CityScoreResult | null>(null);
+  const [priorities, setPriorities] = useState<CityScorePriorities>({});
   const [transactionStats, setTransactionStats] = useState<AveragePricePerSqm | null>(null);
   const [transactionPeriod, setTransactionPeriod] = useState<string | null>(null);
   const [landPriceStats, setLandPriceStats] = useState<AverageLandPricePerSqm | null>(null);
@@ -263,30 +294,51 @@ function CityExplorer({
         `/api/estat/construction-cost?prefectureCode=${jpPrefecture.code}`,
       ).then((r) => r.json());
       setConstructionCost(constructionJson.status === "AVAILABLE" ? (constructionJson.data ?? null) : null);
-
-      const score = computeCityScore({
-        populationChangeRatePercent:
-          rateData.status === "AVAILABLE" && rateData.data ? rateData.data.value : null,
-        hazards: hazardResults,
-        amenities: amenityResults.map((a) => ({
-          category: a.category,
-          status: a.status,
-          nearestDistanceMeters: a.nearestDistanceMeters,
-        })),
-        station: stationResult
-          ? {
-              status: stationResult.status,
-              nearestDistanceMeters: stationResult.nearestDistanceMeters,
-              nearestJrDistanceMeters: stationResult.nearestJrDistanceMeters,
-            }
-          : null,
-      });
-      setCityScore(score);
     } catch {
       setAnalysisError(true);
     } finally {
       setLoadingAnalysis(false);
     }
+  };
+
+  // Dérivé des résultats déjà en mémoire (jamais un nouvel appel réseau)
+  // — recalcule instantanément dès que l'utilisateur ajuste ses
+  // priorités, sans redemander les données à MLIT/e-Stat.
+  const cityScore = useMemo(() => {
+    if (!changeRate && hazards.length === 0 && amenities.length === 0 && !station) return null;
+    return computeCityScore(
+      {
+        populationChangeRatePercent: changeRate?.status === "AVAILABLE" && changeRate.data ? changeRate.data.value : null,
+        hazards,
+        amenities: amenities.map((a) => ({
+          category: a.category,
+          status: a.status,
+          nearestDistanceMeters: a.nearestDistanceMeters,
+        })),
+        station: station
+          ? {
+              status: station.status,
+              nearestDistanceMeters: station.nearestDistanceMeters,
+              nearestJrDistanceMeters: station.nearestJrDistanceMeters,
+            }
+          : null,
+      },
+      priorities,
+    );
+  }, [changeRate, hazards, amenities, station, priorities]);
+
+  const isPinned = selectedMunicipality ? pinnedCodes.has(selectedMunicipality.code) : false;
+
+  const handleTogglePin = () => {
+    if (!selectedMunicipality || !cityScore) return;
+    onTogglePin({
+      prefectureLabel: jpPrefecture.label,
+      municipalityCode: selectedMunicipality.code,
+      municipalityName: selectedMunicipality.nameJa,
+      score: cityScore.score,
+      category: cityScore.category,
+      axes: cityScore.axes,
+    });
   };
 
   return (
@@ -364,13 +416,18 @@ function CityExplorer({
 
       {cityScore && (
         <Card className="mt-4 border-border p-6">
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between gap-3">
             <p className="text-sm font-medium text-foreground">Note de la ville</p>
-            {cityScore.score !== null ? (
-              <span className="text-2xl font-semibold text-foreground">{cityScore.score}/100</span>
-            ) : (
-              <span className="text-sm text-muted-foreground">Non calculable</span>
-            )}
+            <div className="flex items-center gap-3">
+              {cityScore.score !== null ? (
+                <span className="text-2xl font-semibold text-foreground">{cityScore.score}/100</span>
+              ) : (
+                <span className="text-sm text-muted-foreground">Non calculable</span>
+              )}
+              <Button variant={isPinned ? "default" : "outline"} size="sm" onClick={handleTogglePin}>
+                {isPinned ? "📌 Épinglée" : "📌 Épingler pour comparer"}
+              </Button>
+            </div>
           </div>
           {cityScore.coverageIncomplete && (
             <p className="mb-3 text-xs text-amber-700">
@@ -389,6 +446,36 @@ function CityExplorer({
               </li>
             ))}
           </ul>
+
+          <div className="mt-4 border-t border-border pt-4">
+            <p className="mb-1 text-xs font-medium text-foreground">🎯 Vos priorités (optionnel)</p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Indiquez ce qui compte le plus pour vous — la note se recalcule instantanément, sans redemander les
+              données.
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(Object.keys(PRIORITY_AXIS_LABELS) as CityScoreAxisKey[]).map((key) => (
+                <PriorityToggle
+                  key={key}
+                  label={PRIORITY_AXIS_LABELS[key]}
+                  value={priorities[key]}
+                  onChange={(value) =>
+                    setPriorities((prev) => {
+                      const next = { ...prev };
+                      if (value) next[key] = value;
+                      else delete next[key];
+                      return next;
+                    })
+                  }
+                />
+              ))}
+            </div>
+            {Object.keys(priorities).length > 0 && (
+              <Button variant="ghost" size="sm" className="mt-2" onClick={() => setPriorities({})}>
+                Réinitialiser mes priorités
+              </Button>
+            )}
+          </div>
         </Card>
       )}
 
@@ -587,15 +674,70 @@ function CityExplorer({
   );
 }
 
+function PriorityToggle({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: CityScorePriority | undefined;
+  onChange: (value: CityScorePriority | undefined) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-xs">
+      <span className="text-foreground">{label}</span>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          onClick={() => onChange(value === "peu_importe" ? undefined : "peu_importe")}
+          className={`rounded px-2 py-1 ${
+            value === "peu_importe"
+              ? "bg-muted-foreground/20 font-medium text-foreground"
+              : "text-muted-foreground hover:bg-accent"
+          }`}
+        >
+          Peu importe
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(value === "important" ? undefined : "important")}
+          className={`rounded px-2 py-1 ${
+            value === "important" ? "bg-primary font-medium text-primary-foreground" : "text-muted-foreground hover:bg-accent"
+          }`}
+        >
+          Important
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // L'onglet a son propre choix de préfecture (les 47), indépendant de la
 // région d'investissement curatée choisie à l'étape 2 (`prefecture`,
 // limitée aux 18 régions de data/regions.json) — pré-rempli avec elle
 // quand elle correspond à une préfecture réelle connue, mais librement
 // modifiable ensuite : explorer une ville ne doit pas dépendre d'avoir
 // déjà choisi une région d'investissement, ni s'y limiter.
+const MAX_PINNED_CITIES = 5;
+
 export function CitySection({ prefecture }: CitySectionProps) {
   const suggestedCode = findPrefectureByRegionLabel(prefecture ?? "")?.code ?? null;
   const [selectedCode, setSelectedCode] = useState<string | null>(suggestedCode);
+  const [pinnedCities, setPinnedCities] = useState<PinnedCity[]>([]);
+
+  // Vit ici (jamais dans CityExplorer, remonté à chaque changement de
+  // préfecture) : permet de comparer des communes de préfectures
+  // différentes — l'usage typique de quelqu'un qui explore plusieurs
+  // pistes sans bien précis en tête.
+  const handleTogglePin = (snapshot: PinnedCity) => {
+    setPinnedCities((prev) => {
+      const exists = prev.some((c) => c.municipalityCode === snapshot.municipalityCode);
+      if (exists) return prev.filter((c) => c.municipalityCode !== snapshot.municipalityCode);
+      if (prev.length >= MAX_PINNED_CITIES) return prev;
+      return [...prev, snapshot];
+    });
+  };
+  const pinnedCodes = useMemo(() => new Set(pinnedCities.map((c) => c.municipalityCode)), [pinnedCities]);
 
   // Pattern React officiel pour ajuster un état dérivé d'une prop qui
   // change (https://react.dev/learn/you-might-not-need-an-effect) : un
@@ -638,5 +780,86 @@ export function CitySection({ prefecture }: CitySectionProps) {
     );
   }
 
-  return <CityExplorer key={jpPrefecture.code} jpPrefecture={jpPrefecture} onChangePrefecture={setSelectedCode} />;
+  return (
+    <>
+      <CityExplorer
+        key={jpPrefecture.code}
+        jpPrefecture={jpPrefecture}
+        onChangePrefecture={setSelectedCode}
+        pinnedCodes={pinnedCodes}
+        onTogglePin={handleTogglePin}
+      />
+      {pinnedCities.length > 0 && (
+        <CityComparisonTable cities={pinnedCities} onRemove={handleTogglePin} />
+      )}
+    </>
+  );
+}
+
+// Comparatif des communes épinglées — pense au visiteur qui n'a aucun
+// bien en tête et hésite entre plusieurs pistes : chaque "Analyser la
+// ville" écraserait sinon le résultat précédent, rendant impossible
+// toute comparaison entre deux communes, a fortiori de préfectures
+// différentes.
+function CityComparisonTable({ cities, onRemove }: { cities: PinnedCity[]; onRemove: (city: PinnedCity) => void }) {
+  const allAxisKeys = Array.from(new Set(cities.flatMap((c) => c.axes.map((a) => a.key)))) as CityScoreAxisKey[];
+
+  return (
+    <motion.section
+      initial={{ opacity: 0, y: 16 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4 }}
+      className="mt-4"
+    >
+      <Card className="border-border p-6">
+        <p className="mb-1 text-sm font-medium text-foreground">🔍 Comparatif des communes épinglées</p>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Jusqu&apos;à {MAX_PINNED_CITIES} communes, même de préfectures différentes — utile pour comparer plusieurs
+          pistes sans devoir choisir tout de suite.
+        </p>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[480px] text-sm">
+            <thead>
+              <tr className="border-b border-border text-left text-xs text-muted-foreground">
+                <th className="py-2 pr-3">Commune</th>
+                <th className="py-2 pr-3">Note</th>
+                {allAxisKeys.map((key) => (
+                  <th key={key} className="py-2 pr-3">
+                    {PRIORITY_AXIS_LABELS[key]}
+                  </th>
+                ))}
+                <th className="py-2" />
+              </tr>
+            </thead>
+            <tbody>
+              {cities.map((city) => (
+                <tr key={city.municipalityCode} className="border-b border-border last:border-0">
+                  <td className="py-2 pr-3">
+                    <span className="font-medium text-foreground">{city.municipalityName}</span>
+                    <span className="ml-1 text-xs text-muted-foreground">({city.prefectureLabel})</span>
+                  </td>
+                  <td className="py-2 pr-3 font-medium text-foreground">
+                    {city.score !== null ? `${city.score}/100` : "—"}
+                  </td>
+                  {allAxisKeys.map((key) => {
+                    const axis = city.axes.find((a) => a.key === key);
+                    return (
+                      <td key={key} className="py-2 pr-3 text-muted-foreground">
+                        {axis ? `${axis.score}/10` : "—"}
+                      </td>
+                    );
+                  })}
+                  <td className="py-2">
+                    <Button variant="ghost" size="sm" onClick={() => onRemove(city)}>
+                      Retirer
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+    </motion.section>
+  );
 }

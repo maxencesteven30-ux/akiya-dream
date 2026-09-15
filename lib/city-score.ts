@@ -22,10 +22,30 @@ import type { StationSearchStatus } from "@/lib/stations/provider";
 
 export type CityScoreAxisKey = "demographie" | "risques" | "services" | "gare";
 
-const WEIGHT_DEMOGRAPHIE = 25;
-const WEIGHT_RISQUES = 25;
-const WEIGHT_SERVICES = 25;
-const WEIGHT_GARE = 25;
+// Poids par défaut, égaux, quand l'utilisateur n'exprime aucune
+// priorité personnelle — comportement historique, inchangé.
+const DEFAULT_WEIGHT = 25;
+
+// Personnalisation optionnelle : l'utilisateur peut indiquer qu'un axe
+// compte plus ("important", poids doublé) ou moins ("peu_importe",
+// poids réduit sans jamais atteindre 0) pour LUI, sans jamais exclure
+// un axe mesuré du calcul — contrairement au choix "peu importe" de
+// lib/scoring.ts (RegionFinder, qui exclut un CRITÈRE non mesuré d'une
+// région), ici chaque axe reste une mesure réelle de LA MÊME commune :
+// le déprioriser ne doit pas faire disparaître l'information, seulement
+// réduire son poids dans la synthèse.
+export type CityScorePriority = "important" | "peu_importe";
+export type CityScorePriorities = Partial<Record<CityScoreAxisKey, CityScorePriority>>;
+
+const PRIORITY_WEIGHT: Record<CityScorePriority, number> = {
+  important: 40,
+  peu_importe: 10,
+};
+
+function resolveWeight(axisKey: CityScoreAxisKey, priorities?: CityScorePriorities): number {
+  const preference = priorities?.[axisKey];
+  return preference ? PRIORITY_WEIGHT[preference] : DEFAULT_WEIGHT;
+}
 
 export interface CityScoreAxis {
   key: CityScoreAxisKey;
@@ -72,7 +92,7 @@ function scoreDemographie(ratePercent: number | null): CityScoreAxis | null {
     ratePercent >= 0
       ? `Population en évolution de ${ratePercent > 0 ? "+" : ""}${ratePercent.toFixed(1)}% sur la période mesurée par e-Stat.`
       : `Population en déclin de ${ratePercent.toFixed(1)}% sur la période mesurée par e-Stat.`;
-  return { key: "demographie", label: "Démographie", score, weight: WEIGHT_DEMOGRAPHIE, justification };
+  return { key: "demographie", label: "Démographie", score, weight: DEFAULT_WEIGHT, justification };
 }
 
 export interface CityScoreHazardInput {
@@ -98,7 +118,7 @@ function scoreRisques(hazards: CityScoreHazardInput[]): CityScoreAxis | null {
     inZoneCount === 0
       ? `Aucune zone de risque MLIT détectée parmi les ${determinate.length} catégorie(s) vérifiée(s).`
       : `${inZoneCount} zone(s) de risque MLIT détectée(s) sur ${determinate.length} catégorie(s) vérifiée(s).`;
-  return { key: "risques", label: "Risques naturels", score, weight: WEIGHT_RISQUES, justification };
+  return { key: "risques", label: "Risques naturels", score, weight: DEFAULT_WEIGHT, justification };
 }
 
 export interface CityScoreAmenityInput {
@@ -117,7 +137,7 @@ function scoreServices(amenities: CityScoreAmenityInput[]): CityScoreAxis | null
   const avg = perCategoryScores.reduce((sum, s) => sum + s, 0) / perCategoryScores.length;
   const score = round1(avg);
   const justification = `${found.length} type(s) de service essentiel trouvé(s) à proximité (MLIT, données ponctuelles à l'échelle de la tuile consultée).`;
-  return { key: "services", label: "Services de proximité", score, weight: WEIGHT_SERVICES, justification };
+  return { key: "services", label: "Services de proximité", score, weight: DEFAULT_WEIGHT, justification };
 }
 
 export interface CityScoreStationInput {
@@ -142,7 +162,7 @@ function scoreGare(station: CityScoreStationInput | null): CityScoreAxis | null 
   const justification = hasNearbyJr
     ? `Gare la plus proche à ${distanceKm} km, dont une ligne JR à proximité (réseau grandes lignes).`
     : `Gare la plus proche à ${distanceKm} km (réseau non-JR ou JR au-delà de 5 km).`;
-  return { key: "gare", label: "Gare & réseau ferré", score, weight: WEIGHT_GARE, justification };
+  return { key: "gare", label: "Gare & réseau ferré", score, weight: DEFAULT_WEIGHT, justification };
 }
 
 export interface ComputeCityScoreInput {
@@ -152,14 +172,19 @@ export interface ComputeCityScoreInput {
   station: CityScoreStationInput | null;
 }
 
-export function computeCityScore(input: ComputeCityScoreInput): CityScoreResult {
+export function computeCityScore(
+  input: ComputeCityScoreInput,
+  priorities?: CityScorePriorities,
+): CityScoreResult {
   const candidates: (CityScoreAxis | null)[] = [
     scoreDemographie(input.populationChangeRatePercent),
     scoreRisques(input.hazards),
     scoreServices(input.amenities),
     scoreGare(input.station),
   ];
-  const axes = candidates.filter((a): a is CityScoreAxis => a !== null);
+  const axes = candidates
+    .filter((a): a is CityScoreAxis => a !== null)
+    .map((a) => ({ ...a, weight: resolveWeight(a.key, priorities) }));
 
   if (axes.length === 0) {
     return { score: null, category: null, axes: [], coverageIncomplete: true };

@@ -161,3 +161,54 @@ describe("computeCityScore", () => {
     expect(worst.score).toBeLessThanOrEqual(100);
   });
 });
+
+describe("computeCityScore avec priorités personnalisées", () => {
+  const FULL_COVERAGE_INPUT: ComputeCityScoreInput = {
+    populationChangeRatePercent: 5, // axe démographie au maximum (10/10)
+    hazards: [
+      { category: "flood", status: "IN_ZONE" },
+      { category: "tsunami", status: "IN_ZONE" },
+      { category: "storm_surge", status: "IN_ZONE" },
+      { category: "landslide", status: "IN_ZONE" },
+    ], // axe risques au minimum (0/10)
+    amenities: [{ category: "school", status: "FOUND", nearestDistanceMeters: 500 }],
+    station: { status: "FOUND", nearestDistanceMeters: 500, nearestJrDistanceMeters: null },
+  };
+
+  it("sans priorité, les 4 axes gardent un poids égal (comportement historique)", () => {
+    const result = computeCityScore(FULL_COVERAGE_INPUT);
+    const weights = result.axes.map((a) => a.weight);
+    expect(new Set(weights)).toEqual(new Set([25]));
+  });
+
+  it("marquer un axe 'important' augmente son poids, sans exclure les autres", () => {
+    const result = computeCityScore(FULL_COVERAGE_INPUT, { demographie: "important" });
+    const demo = result.axes.find((a) => a.key === "demographie")!;
+    const others = result.axes.filter((a) => a.key !== "demographie");
+    expect(demo.weight).toBeGreaterThan(25);
+    for (const axis of others) {
+      expect(axis.weight).toBe(25); // non priorisés : poids par défaut inchangé
+    }
+  });
+
+  it("marquer un axe 'peu_importe' réduit son poids sans jamais l'exclure (axe toujours présent)", () => {
+    const result = computeCityScore(FULL_COVERAGE_INPUT, { risques: "peu_importe" });
+    const risques = result.axes.find((a) => a.key === "risques")!;
+    expect(risques.weight).toBeLessThan(25);
+    expect(risques.weight).toBeGreaterThan(0);
+    expect(result.axes).toHaveLength(4); // l'axe reste affiché, jamais retiré
+  });
+
+  it("prioriser l'axe où la ville excelle augmente son score global par rapport à prioriser l'axe faible", () => {
+    // démographie = 10/10 (excellent), risques = 0/10 (mauvais) dans FULL_COVERAGE_INPUT
+    const prioriseDemographie = computeCityScore(FULL_COVERAGE_INPUT, { demographie: "important" });
+    const priorisesRisques = computeCityScore(FULL_COVERAGE_INPUT, { risques: "important" });
+    expect(prioriseDemographie.score!).toBeGreaterThan(priorisesRisques.score!);
+  });
+
+  it("une priorité sur un axe sans donnée disponible n'a aucun effet (l'axe reste absent)", () => {
+    const result = computeCityScore(EMPTY_INPUT, { demographie: "important" });
+    expect(result.axes).toHaveLength(0);
+    expect(result.score).toBeNull();
+  });
+});

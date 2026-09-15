@@ -155,16 +155,23 @@ export function RegionFinder({
               Choisissez au moins une préférence ci-dessus pour classer les régions.
             </p>
           ) : (
-            <ul className="space-y-3">
-              {scores.slice(0, 5).map((score, index) => (
-                <RegionScoreRow
-                  key={score.region.prefecture}
-                  rank={index + 1}
-                  score={score}
-                  onSelect={() => onSelectRegion(score.region.prefecture)}
-                />
-              ))}
-            </ul>
+            <>
+              <ul className="space-y-3">
+                {scores.slice(0, 5).map((score, index) => (
+                  <RegionScoreRow
+                    key={score.region.prefecture}
+                    rank={index + 1}
+                    score={score}
+                    onSelect={() => onSelectRegion(score.region.prefecture)}
+                  />
+                ))}
+              </ul>
+              <p className="mt-4 text-xs text-muted-foreground">
+                💡 Une fois une région choisie, l&apos;onglet <strong>🏙️ La ville</strong> plus bas vous permet
+                d&apos;explorer une commune précise à l&apos;intérieur (démographie, risques, services, gares, prix
+                de marché) — sans avoir besoin d&apos;un bien précis en tête.
+              </p>
+            </>
           )}
         </div>
       </Card>
