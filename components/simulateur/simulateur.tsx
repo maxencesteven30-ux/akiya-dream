@@ -705,7 +705,7 @@ export function Simulateur() {
             <div id="city-section">
               <CitySection prefecture={state.prefecture} onUseCity={useCityForProject} />
             </div>
-            <DiscoverySection simulatorState={state} />
+            <DiscoverySection simulatorState={state} regions={regions} />
             <RealListingSection
               realListing={state.realListing}
               onChange={setRealListing}

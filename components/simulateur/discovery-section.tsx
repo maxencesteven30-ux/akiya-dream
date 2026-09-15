@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { formatEur, formatJpy } from "@/lib/format";
 import { jpyToEur } from "@/lib/data";
-import type { SimulatorState } from "@/lib/types";
+import type { Region, SimulatorState } from "@/lib/types";
 import { deriveSearchProfileFromProject, type SearchProfile } from "@/lib/discovery/search-profile";
 import {
   buildPropertyListingFromManualIntake,
@@ -44,6 +44,17 @@ import {
 } from "@/lib/discovery/discovery-orchestrator";
 import { SearchProfileEditor } from "@/components/simulateur/search-profile-editor";
 import { TriStateSelect } from "@/components/simulateur/tri-state-select";
+import {
+  buildOpportunityInput,
+  type OpportunityBridgeContext,
+} from "@/lib/discovery/listing-opportunity-bridge";
+import { fetchListingMarketContext } from "@/lib/discovery/listing-market-context-bridge";
+import { fetchListingCityScore } from "@/lib/discovery/listing-city-score-bridge";
+import { explainListingEvaluation } from "@/lib/evidence-graph";
+import { computeOpportunityScore, type OpportunityResult } from "@/lib/opportunity";
+import type { CityScoreResult } from "@/lib/city-score";
+import type { MarketContext } from "@/lib/market-context";
+import { MARKET_CONTEXT_LABELS } from "@/lib/market-context";
 
 // Era 9 / Phase AN — Discovery UI.
 //
@@ -101,9 +112,25 @@ function ParseHint({ raw, hint }: { raw: string | null; hint: string | null }) {
 
 interface DiscoverySectionProps {
   simulatorState: SimulatorState;
+  regions: Region[];
 }
 
-export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
+export function DiscoverySection({ simulatorState, regions }: DiscoverySectionProps) {
+  // Contexte Opportunity Engine dérivé du projet en cours — jamais un
+  // second endroit où choisir profil/niveau de travaux/budget : reprend
+  // exactement ce que l'utilisateur a déjà renseigné ailleurs. null tant
+  // que profil ou niveau de travaux ne sont pas encore choisis (rien à
+  // deviner à leur place).
+  const opportunityContext: OpportunityBridgeContext | null =
+    simulatorState.profile !== null && simulatorState.renovationLevel !== null
+      ? {
+          profile: simulatorState.profile,
+          renovationLevel: simulatorState.renovationLevel,
+          region: regions.find((r) => r.prefecture === simulatorState.prefecture) ?? null,
+          capitalDisponibleEur: simulatorState.capitalDisponibleEur,
+          reserveSecuriteEur: simulatorState.reserveSecuriteEur,
+        }
+      : null;
   const [open, setOpen] = useState(false);
   const [candidates, setCandidates] = useState<PropertyListing[]>(() => {
     try {
@@ -577,18 +604,21 @@ export function DiscoverySection({ simulatorState }: DiscoverySectionProps) {
                 icon="✅"
                 tint="border-emerald-600/30 bg-emerald-600/5"
                 items={discoveryResult.eligible}
+                opportunityContext={opportunityContext}
               />
               <DiscoveryResultColumn
                 title="À vérifier"
                 icon="🟠"
                 tint="border-amber-600/30 bg-amber-600/5"
                 items={discoveryResult.needsReview}
+                opportunityContext={opportunityContext}
               />
               <DiscoveryResultColumn
                 title="Exclus"
                 icon="⛔"
                 tint="border-destructive/30 bg-destructive/5"
                 items={discoveryResult.excluded}
+                opportunityContext={opportunityContext}
               />
             </div>
           </div>
@@ -620,11 +650,13 @@ function DiscoveryResultColumn({
   icon,
   tint,
   items,
+  opportunityContext,
 }: {
   title: string;
   icon: string;
   tint: string;
   items: DiscoveryResultItem[];
+  opportunityContext: OpportunityBridgeContext | null;
 }) {
   return (
     <Card className={`p-4 ${tint}`}>
@@ -636,28 +668,176 @@ function DiscoveryResultColumn({
       ) : (
         <ul className="space-y-2 text-xs">
           {items.map((item) => (
-            <li key={item.listing.id} className="rounded-md border border-border bg-card p-2.5">
-              <p className="font-medium text-foreground">
-                {item.listing.title ?? `${item.listing.source} #${item.listing.sourceListingId}`}
-              </p>
-              <p className="mt-0.5 text-muted-foreground">
-                Score préférences : {item.softPreferenceScore.score}/{item.softPreferenceScore.activeCriteriaCount}
-              </p>
-              {item.hardConstraintEvaluation.checks.filter((c) => c.status !== "NOT_APPLICABLE").length > 0 && (
-                <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
-                  {item.hardConstraintEvaluation.checks
-                    .filter((c) => c.status !== "NOT_APPLICABLE")
-                    .map((c) => (
-                      <li key={c.criterionId}>
-                        {c.label} : <span className="text-foreground">{c.status}</span>
-                      </li>
-                    ))}
-                </ul>
-              )}
-            </li>
+            <DiscoveryResultCard key={item.listing.id} item={item} opportunityContext={opportunityContext} />
           ))}
         </ul>
       )}
     </Card>
+  );
+}
+
+// Section 5 de la mission : Match / Qualité des données / Risque /
+// Opportunity restent quatre dimensions SÉPARÉES, jamais fusionnées en
+// un score unique. "Enrichir" est une action manuelle (même discipline
+// de rafraîchissement que le reste de l'app, cf. hazard/ville/marché) —
+// jamais déclenchée automatiquement au rendu, pour ne pas multiplier les
+// appels API à chaque candidat affiché (section 49 de la mission).
+const RELEVANT_LISTING_FIELDS: (keyof PropertyListing)[] = [
+  "priceJpy",
+  "prefecture",
+  "municipality",
+  "municipalityCode",
+  "latitude",
+  "longitude",
+  "landAreaM2",
+  "buildingAreaM2",
+  "roomCount",
+  "buildingYear",
+  "hasGarden",
+  "hasParking",
+  "nearestStation",
+  "stationDistance",
+  "roadAccess",
+  "rebuildability",
+  "water",
+  "electricity",
+  "gas",
+  "sewage",
+  "septicTank",
+];
+
+// Mesure de complétude simple et documentée (proportion de champs
+// pertinents renseignés) — jamais fusionnée avec le score de
+// correspondance (Match), qui répond à une question différente.
+function computeDataQualityPercent(listing: PropertyListing): number {
+  const known = RELEVANT_LISTING_FIELDS.filter((field) => listing[field] !== null).length;
+  return Math.round((known / RELEVANT_LISTING_FIELDS.length) * 100);
+}
+
+const REALITY_ITEM_LABELS: Partial<Record<keyof PropertyListing, string>> = {
+  roadAccess: "Accès routier",
+  rebuildability: "Droit de reconstruire",
+  water: "Eau",
+  electricity: "Électricité",
+  gas: "Gaz",
+  sewage: "Tout-à-l'égout",
+  septicTank: "Fosse septique",
+};
+
+function DiscoveryResultCard({
+  item,
+  opportunityContext,
+}: {
+  item: DiscoveryResultItem;
+  opportunityContext: OpportunityBridgeContext | null;
+}) {
+  const [enriching, setEnriching] = useState(false);
+  const [enriched, setEnriched] = useState(false);
+  const [enrichError, setEnrichError] = useState(false);
+  const [cityScore, setCityScore] = useState<CityScoreResult | null>(null);
+  const [marketContext, setMarketContext] = useState<MarketContext | null>(null);
+  const [opportunity, setOpportunity] = useState<OpportunityResult | null>(null);
+
+  const evidence = useMemo(() => explainListingEvaluation(item), [item]);
+  const activeRealityItems = (Object.keys(REALITY_ITEM_LABELS) as (keyof PropertyListing)[]).filter(
+    (key) => item.listing[key] !== null,
+  );
+
+  const handleEnrich = async () => {
+    setEnriching(true);
+    setEnrichError(false);
+    try {
+      const [city, market] = await Promise.all([
+        fetchListingCityScore(item.listing),
+        fetchListingMarketContext(item.listing),
+      ]);
+      setCityScore(city);
+      setMarketContext(market);
+      if (opportunityContext) {
+        const input = buildOpportunityInput(item.listing, opportunityContext);
+        setOpportunity(input ? computeOpportunityScore(input) : null);
+      } else {
+        setOpportunity(null);
+      }
+      setEnriched(true);
+    } catch {
+      setEnrichError(true);
+    } finally {
+      setEnriching(false);
+    }
+  };
+
+  return (
+    <li className="rounded-md border border-border bg-card p-2.5">
+      <p className="font-medium text-foreground">
+        {item.listing.title ?? `${item.listing.source} #${item.listing.sourceListingId}`}
+      </p>
+      <p className="mt-0.5 text-muted-foreground">
+        Correspondance (préférences) : {item.softPreferenceScore.score}/{item.softPreferenceScore.activeCriteriaCount}
+      </p>
+      <p className="mt-0.5 text-muted-foreground">Qualité des données : {computeDataQualityPercent(item.listing)}%</p>
+      {item.hardConstraintEvaluation.checks.filter((c) => c.status !== "NOT_APPLICABLE").length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
+          {item.hardConstraintEvaluation.checks
+            .filter((c) => c.status !== "NOT_APPLICABLE")
+            .map((c) => (
+              <li key={c.criterionId}>
+                {c.label} : <span className="text-foreground">{c.status}</span>
+              </li>
+            ))}
+        </ul>
+      )}
+
+      {activeRealityItems.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5 text-muted-foreground">
+          {activeRealityItems.map((key) => (
+            <li key={key}>
+              Risque — {REALITY_ITEM_LABELS[key]} : <span className="text-foreground">{item.listing[key] as string}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="mt-2">
+        <Button variant="outline" size="sm" onClick={handleEnrich} disabled={enriching}>
+          {enriching ? "Enrichissement..." : "🔍 Enrichir (Ville / Marché / Opportunity)"}
+        </Button>
+      </div>
+
+      {enrichError && <p className="mt-1.5 text-destructive">Impossible d&apos;enrichir ce bien actuellement.</p>}
+
+      {enriched && (
+        <div className="mt-2 space-y-1.5 border-t border-border/60 pt-2">
+          <p>
+            Ville :{" "}
+            {cityScore?.score !== null && cityScore?.score !== undefined
+              ? `${cityScore.score}/100`
+              : "non calculable — localisation insuffisante"}
+          </p>
+          <p>
+            Marché :{" "}
+            {marketContext ? MARKET_CONTEXT_LABELS[marketContext.level] : "non calculable — prix ou commune manquant"}
+          </p>
+          <p>
+            Opportunity :{" "}
+            {opportunityContext === null
+              ? "non calculable — profil ou niveau de travaux non défini pour le projet"
+              : opportunity
+                ? `${opportunity.score}/10`
+                : "non calculable — prix du bien manquant"}
+          </p>
+          <div className="rounded-md border border-border/60 bg-muted/20 p-2">
+            <p className="font-medium text-foreground">🔍 Pourquoi ce bien ?</p>
+            <p className="mt-0.5 text-muted-foreground">{evidence.reasonMessage}</p>
+            {evidence.unknownFields.length > 0 && (
+              <p className="mt-0.5 text-amber-700">
+                À vérifier : {evidence.unknownFields.map((f) => f.replace("listing.", "")).join(", ")}
+              </p>
+            )}
+            <p className="mt-0.5 text-muted-foreground">{evidence.nextAction}</p>
+          </div>
+        </div>
+      )}
+    </li>
   );
 }
