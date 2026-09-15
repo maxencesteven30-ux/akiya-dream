@@ -79,3 +79,17 @@ export function findPrefectureByRegionLabel(regionLabel: string): JapanPrefectur
   const base = basePrefectureLabel(regionLabel);
   return JAPAN_PREFECTURES.find((p) => p.label === base) ?? null;
 }
+
+// Résout un texte libre (ex. un champ de saisie manuelle non vérifié,
+// cf. lib/discovery/manual-intake.ts) vers une préfecture réelle
+// UNIQUEMENT en cas de correspondance EXACTE (nom japonais ou libellé
+// anglais, insensible à la casse) — jamais une correspondance partielle
+// ou approximative, qui risquerait de rattacher un bien à la mauvaise
+// préfecture.
+export function findPrefectureByFreeText(text: string | null): JapanPrefecture | null {
+  if (!text) return null;
+  const trimmed = text.trim();
+  if (trimmed === "") return null;
+  const normalized = trimmed.toLowerCase();
+  return JAPAN_PREFECTURES.find((p) => p.nameJa === trimmed || p.label.toLowerCase() === normalized) ?? null;
+}

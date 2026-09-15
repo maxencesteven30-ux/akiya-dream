@@ -8,6 +8,9 @@ import { NO_DATA_COLOR, valueToColor } from "@/lib/map-colors";
 import { formatEur, formatJpy } from "@/lib/format";
 import { jpyToEur } from "@/lib/data";
 import type { Region, RegionAttributes } from "@/lib/types";
+import { CANDIDATES_STORAGE_KEY } from "@/components/simulateur/discovery-section";
+import type { PropertyListing } from "@/lib/discovery/property-listing";
+import { countListingsByRegion } from "@/lib/discovery/listing-region-match";
 
 interface JapanMapProps {
   regions: Region[];
@@ -15,13 +18,14 @@ interface JapanMapProps {
   onSelectRegion: (prefecture: string) => void;
 }
 
-type MapMode = "prix" | "anciennete" | "aides" | "neige";
+type MapMode = "prix" | "anciennete" | "aides" | "neige" | "decouvertes";
 
 const MODE_LABELS: Record<MapMode, string> = {
   prix: "Prix médian",
   anciennete: "Ancienneté du parc (% pré-1981)",
   aides: "Subvention documentée",
   neige: "Neige moyenne / an",
+  decouvertes: "Biens découverts (pool de recherche)",
 };
 
 // Classe CSS anglaise (fichier SVG geolonia/japanese-prefectures) -> nom
@@ -59,7 +63,6 @@ export function JapanMap({ regions, regionAttributes, onSelectRegion }: JapanMap
   const [hovered, setHovered] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [svgReady, setSvgReady] = useState(false);
-
   useEffect(() => {
     if (!open || svgReady) return;
     let ignore = false;
@@ -75,6 +78,37 @@ export function JapanMap({ regions, regionAttributes, onSelectRegion }: JapanMap
       ignore = true;
     };
   }, [open, svgReady]);
+
+  // Lecture seule du même pool que l'onglet Discovery (localStorage
+  // partagé, cf. CANDIDATES_STORAGE_KEY) — jamais un second moteur de
+  // recherche, seulement un affichage agrégé de ce qui existe déjà.
+  // Dérivée directement au rendu (pas d'effet + état séparé) : ne relit
+  // que lorsque la carte s'ouvre, jamais à chaque survol/changement de
+  // mode qui ne modifie pas le pool lui-même.
+  const discoveryCandidates = useMemo<PropertyListing[]>(() => {
+    if (!open) return [];
+    try {
+      const raw = window.localStorage.getItem(CANDIDATES_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as PropertyListing[]) : [];
+    } catch (err) {
+      console.error("Lecture du pool de candidats depuis localStorage impossible:", err);
+      return [];
+    }
+  }, [open]);
+
+  const discoveryCounts = useMemo(
+    () => countListingsByRegion(discoveryCandidates, regions),
+    [discoveryCandidates, regions],
+  );
+  const hasDiscoveryData = discoveryCounts.size > 0;
+
+  // Si le mode "biens découverts" devient invalide (pool vidé pendant
+  // que ce mode était actif), retombe sur "prix" — pattern React
+  // officiel (setState conditionnel pendant le rendu, jamais dans un
+  // effet) pour ajuster un état dérivé d'une donnée externe qui change.
+  if (mode === "decouvertes" && !hasDiscoveryData) {
+    setMode("prix");
+  }
 
   const valuesByRegion = useMemo(() => {
     const map = new Map<string, number | null>();
@@ -94,11 +128,14 @@ export function JapanMap({ regions, regionAttributes, onSelectRegion }: JapanMap
         case "neige":
           value = attrs?.avgAnnualSnowfallCm ?? null;
           break;
+        case "decouvertes":
+          value = discoveryCounts.get(region.prefecture) ?? null;
+          break;
       }
       map.set(region.prefecture, value);
     }
     return map;
-  }, [regions, regionAttributes, mode]);
+  }, [regions, regionAttributes, mode, discoveryCounts]);
 
   const [min, max] = useMemo(() => {
     const values = Array.from(valuesByRegion.values()).filter(
@@ -174,17 +211,25 @@ export function JapanMap({ regions, regionAttributes, onSelectRegion }: JapanMap
         </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
-          {(Object.keys(MODE_LABELS) as MapMode[]).map((m) => (
-            <Button
-              key={m}
-              size="sm"
-              variant={mode === m ? "default" : "outline"}
-              onClick={() => setMode(m)}
-            >
-              {MODE_LABELS[m]}
-            </Button>
-          ))}
+          {(Object.keys(MODE_LABELS) as MapMode[])
+            .filter((m) => m !== "decouvertes" || hasDiscoveryData)
+            .map((m) => (
+              <Button
+                key={m}
+                size="sm"
+                variant={mode === m ? "default" : "outline"}
+                onClick={() => setMode(m)}
+              >
+                {MODE_LABELS[m]}
+              </Button>
+            ))}
         </div>
+        {mode === "decouvertes" && (
+          <p className="mb-4 text-xs text-muted-foreground">
+            Compte d&apos;annonces du pool de recherche par région — jamais un emplacement précis par bien (la
+            saisie manuelle ne renseigne pas de coordonnées GPS exactes).
+          </p>
+        )}
 
         <div className="grid gap-6 sm:grid-cols-[1fr_220px]">
           <div className="overflow-x-auto">
@@ -219,6 +264,10 @@ export function JapanMap({ regions, regionAttributes, onSelectRegion }: JapanMap
                       : "Aucune")}
                   {mode === "neige" &&
                     (hoveredValue !== null ? `${hoveredValue} cm/an` : "Donnée indisponible")}
+                  {mode === "decouvertes" &&
+                    (hoveredValue !== null
+                      ? `${hoveredValue} bien${hoveredValue > 1 ? "s" : ""} découvert${hoveredValue > 1 ? "s" : ""}`
+                      : "Aucun bien découvert dans cette région")}
                 </p>
               </div>
             ) : (

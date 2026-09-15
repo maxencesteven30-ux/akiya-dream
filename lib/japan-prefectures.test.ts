@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { basePrefectureLabel, findPrefectureByRegionLabel, JAPAN_PREFECTURES } from "@/lib/japan-prefectures";
+import {
+  basePrefectureLabel,
+  findPrefectureByFreeText,
+  findPrefectureByRegionLabel,
+  JAPAN_PREFECTURES,
+} from "@/lib/japan-prefectures";
 
 describe("basePrefectureLabel", () => {
   it("laisse inchangé un libellé de préfecture simple", () => {
@@ -51,5 +56,27 @@ describe("findPrefectureByRegionLabel", () => {
     for (const name of names) {
       expect(name.length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("findPrefectureByFreeText", () => {
+  it("reconnaît le nom japonais exact", () => {
+    expect(findPrefectureByFreeText("鹿児島県")?.code).toBe("46");
+  });
+
+  it("reconnaît le libellé anglais, insensible à la casse", () => {
+    expect(findPrefectureByFreeText("kagoshima")?.code).toBe("46");
+    expect(findPrefectureByFreeText("Kagoshima")?.code).toBe("46");
+  });
+
+  it("ignore les espaces superflus", () => {
+    expect(findPrefectureByFreeText("  島根県  ")?.code).toBe("32");
+  });
+
+  it("retourne null pour un texte non reconnu, null ou vide -- jamais une correspondance approximative", () => {
+    expect(findPrefectureByFreeText("quelque part")).toBeNull();
+    expect(findPrefectureByFreeText(null)).toBeNull();
+    expect(findPrefectureByFreeText("")).toBeNull();
+    expect(findPrefectureByFreeText("   ")).toBeNull();
   });
 });

@@ -74,7 +74,10 @@ import { removeFavoriteById, toggleFavorite, type FavoriteSnapshot } from "@/lib
 // saisie ici ne doit être confondue avec le bien réel retenu
 // (RealListingSection reste l'endroit où "j'ai trouvé mon bien").
 
-const CANDIDATES_STORAGE_KEY = "akiya-discovery-candidates";
+// Exporté : components/simulateur/japan-map.tsx lit ce même pool en
+// lecture seule pour afficher un compte de biens découverts par région
+// (Phase 4) — une seule source de vérité pour la clé de stockage.
+export const CANDIDATES_STORAGE_KEY = "akiya-discovery-candidates";
 const PROFILE_STORAGE_KEY = "akiya-discovery-profile";
 const FAVORITES_STORAGE_KEY = "akiya-discovery-favorites";
 

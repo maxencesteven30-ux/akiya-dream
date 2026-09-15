@@ -7,7 +7,7 @@ import {
   type CityScoreResult,
   type CityScoreStationInput,
 } from "@/lib/city-score";
-import { JAPAN_PREFECTURES } from "@/lib/japan-prefectures";
+import { findPrefectureByFreeText } from "@/lib/japan-prefectures";
 import type { PolygonHazardCategory } from "@/lib/hazard/provider";
 import type { AmenityCategory } from "@/lib/amenities/provider";
 
@@ -37,16 +37,6 @@ import type { AmenityCategory } from "@/lib/amenities/provider";
 const HAZARD_CATEGORIES: PolygonHazardCategory[] = ["flood", "tsunami", "landslide", "storm_surge"];
 const AMENITY_CATEGORIES: AmenityCategory[] = ["school", "medical", "welfare", "cultural", "town_hall"];
 
-function resolveKnownPrefecture(prefectureRaw: string | null) {
-  if (!prefectureRaw) return null;
-  const normalized = prefectureRaw.trim().toLowerCase();
-  return (
-    JAPAN_PREFECTURES.find(
-      (p) => p.nameJa === prefectureRaw.trim() || p.label.toLowerCase() === normalized,
-    ) ?? null
-  );
-}
-
 interface GeoPoint {
   latitude: number;
   longitude: number;
@@ -60,7 +50,7 @@ async function resolveCenterPoint(
     return { latitude: listing.latitude, longitude: listing.longitude };
   }
 
-  const jpPrefecture = resolveKnownPrefecture(listing.prefecture);
+  const jpPrefecture = findPrefectureByFreeText(listing.prefecture);
   if (!jpPrefecture || !listing.municipality) return null;
 
   const res = await fetchImpl(
