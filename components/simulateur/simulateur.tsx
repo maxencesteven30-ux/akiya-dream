@@ -11,6 +11,7 @@ import {
   HOUSE_PRICE_MIN_JPY,
   ProjetSection,
 } from "@/components/simulateur/projet-section";
+import { CitySection } from "@/components/simulateur/city-section";
 import { ResultatSection } from "@/components/simulateur/resultat-section";
 import { BudgetSection } from "@/components/simulateur/budget-section";
 import { ComparateurSection } from "@/components/simulateur/comparateur-section";
@@ -672,6 +673,7 @@ export function Simulateur() {
               needsTranslation={state.needsTranslation}
               onNeedsTranslationChange={setNeedsTranslation}
             />
+            <CitySection prefecture={state.prefecture} />
             <DiscoverySection simulatorState={state} />
             <RealListingSection
               realListing={state.realListing}
