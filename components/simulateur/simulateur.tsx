@@ -382,6 +382,27 @@ export function Simulateur() {
     setState((prev) => ({ ...prev, reserveSecuriteEur }));
   const setRealListing = (realListing: RealListing | null) =>
     setState((prev) => ({ ...prev, realListing }));
+  // Bridge depuis l'onglet Ville ("Utiliser cette commune pour mon
+  // projet") : fusionne ville + code municipal dans le bien existant
+  // s'il y en a un (ne détruit jamais un bien déjà en cours de saisie),
+  // sinon en crée un nouveau vide par ailleurs. Ne renseigne JAMAIS
+  // latitude/longitude — cf. components/simulateur/city-section.tsx.
+  const useCityForProject = (payload: { city: string; municipalityCode: string }) =>
+    setState((prev) => ({
+      ...prev,
+      realListing: {
+        name: prev.realListing?.name ?? "",
+        city: payload.city,
+        latitude: prev.realListing?.latitude ?? null,
+        longitude: prev.realListing?.longitude ?? null,
+        municipalityCode: payload.municipalityCode,
+        surfaceM2: prev.realListing?.surfaceM2 ?? null,
+        landM2: prev.realListing?.landM2 ?? null,
+        constructionYear: prev.realListing?.constructionYear ?? null,
+        stationDistanceKm: prev.realListing?.stationDistanceKm ?? null,
+        condition: prev.realListing?.condition ?? "unknown",
+      },
+    }));
   const setAccompanimentLevel = (accompanimentLevel: AccompanimentLevel) =>
     setState((prev) => ({ ...prev, accompanimentLevel }));
   const setNeedsTranslation = (needsTranslation: boolean) =>
@@ -673,7 +694,7 @@ export function Simulateur() {
               needsTranslation={state.needsTranslation}
               onNeedsTranslationChange={setNeedsTranslation}
             />
-            <CitySection prefecture={state.prefecture} />
+            <CitySection prefecture={state.prefecture} onUseCity={useCityForProject} />
             <DiscoverySection simulatorState={state} />
             <RealListingSection
               realListing={state.realListing}

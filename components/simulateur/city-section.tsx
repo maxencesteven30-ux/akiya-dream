@@ -103,8 +103,22 @@ export interface PinnedCity {
   axes: CityScoreAxis[];
 }
 
+export interface UseCityPayload {
+  city: string;
+  municipalityCode: string;
+}
+
 interface CitySectionProps {
   prefecture: string | null;
+  // Bridge vers "Bien réel trouvé" (real-listing-section.tsx) : ne
+  // transmet JAMAIS le point de centre-ville GSI comme coordonnées —
+  // seuls la ville et le code municipal (tous deux exacts, vérifiés)
+  // sont propagés. computeGeographicPrecision traiterait tout lat/long
+  // non-null comme "EXACT" (précision d'adresse), ce qu'un centre-ville
+  // approximatif n'est pas : le bien reste donc à précision
+  // "MUNICIPALITY" tant que l'utilisateur ne renseigne pas une adresse
+  // réelle, ce qui est honnête.
+  onUseCity?: (payload: UseCityPayload) => void;
 }
 
 // CityExplorer est remonté (via `key`) à chaque changement de préfecture
@@ -117,11 +131,13 @@ function CityExplorer({
   onChangePrefecture,
   pinnedCodes,
   onTogglePin,
+  onUseCity,
 }: {
   jpPrefecture: JapanPrefecture;
   onChangePrefecture: (code: string | null) => void;
   pinnedCodes: Set<string>;
   onTogglePin: (snapshot: PinnedCity) => void;
+  onUseCity?: (payload: UseCityPayload) => void;
 }) {
   const [municipalities, setMunicipalities] = useState<MunicipalityEntry[]>([]);
   const [loadingMunicipalities, setLoadingMunicipalities] = useState(true);
@@ -388,11 +404,29 @@ function CityExplorer({
             </Select>
           </div>
         </div>
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap gap-2">
           <Button onClick={handleAnalyze} disabled={!selectedMunicipality || loadingAnalysis}>
             {loadingAnalysis ? "Analyse..." : "🔍 Analyser la ville"}
           </Button>
+          {onUseCity && (
+            <Button
+              variant="outline"
+              disabled={!selectedMunicipality}
+              onClick={() =>
+                selectedMunicipality &&
+                onUseCity({ city: selectedMunicipality.nameJa, municipalityCode: selectedMunicipality.code })
+              }
+            >
+              🏠 Utiliser cette commune pour mon projet
+            </Button>
+          )}
         </div>
+        {onUseCity && selectedMunicipality && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Renseigne la ville et le code municipal dans « Bien réel trouvé » ci-dessous — jamais de coordonnées GPS
+            (le centre-ville approximatif n&apos;est pas l&apos;adresse d&apos;un bien précis).
+          </p>
+        )}
 
         {analysisError && (
           <p className="mt-3 text-xs text-destructive">Impossible d&apos;analyser cette commune actuellement.</p>
@@ -719,11 +753,37 @@ function PriorityToggle({
 // modifiable ensuite : explorer une ville ne doit pas dépendre d'avoir
 // déjà choisi une région d'investissement, ni s'y limiter.
 const MAX_PINNED_CITIES = 5;
+const PINNED_CITIES_STORAGE_KEY = "akiya-dream-ville-comparatif";
 
-export function CitySection({ prefecture }: CitySectionProps) {
+function readPinnedCitiesFromStorage(): PinnedCity[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(PINNED_CITIES_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error("Lecture du comparatif de villes depuis localStorage impossible:", err);
+    return [];
+  }
+}
+
+export function CitySection({ prefecture, onUseCity }: CitySectionProps) {
   const suggestedCode = findPrefectureByRegionLabel(prefecture ?? "")?.code ?? null;
   const [selectedCode, setSelectedCode] = useState<string | null>(suggestedCode);
-  const [pinnedCities, setPinnedCities] = useState<PinnedCity[]>([]);
+  // Lu une seule fois au montage (localStorage n'existe pas côté serveur
+  // ; lazy initializer pour éviter de le lire à chaque rendu) — persiste
+  // pour ne jamais perdre un comparatif en cours suite à un rechargement
+  // accidentel de la page.
+  const [pinnedCities, setPinnedCities] = useState<PinnedCity[]>(() => readPinnedCitiesFromStorage());
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(PINNED_CITIES_STORAGE_KEY, JSON.stringify(pinnedCities));
+    } catch (err) {
+      console.error("Écriture du comparatif de villes dans localStorage impossible:", err);
+    }
+  }, [pinnedCities]);
 
   // Vit ici (jamais dans CityExplorer, remonté à chaque changement de
   // préfecture) : permet de comparer des communes de préfectures
@@ -788,6 +848,7 @@ export function CitySection({ prefecture }: CitySectionProps) {
         onChangePrefecture={setSelectedCode}
         pinnedCodes={pinnedCodes}
         onTogglePin={handleTogglePin}
+        onUseCity={onUseCity}
       />
       {pinnedCities.length > 0 && (
         <CityComparisonTable cities={pinnedCities} onRemove={handleTogglePin} />

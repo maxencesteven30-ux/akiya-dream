@@ -74,6 +74,16 @@ export function RealListingSection({
   onApplyEstimatedPrice,
 }: RealListingSectionProps) {
   const [open, setOpen] = useState(realListing !== null);
+  // `realListing` peut devenir non-null APRÈS le montage (ex. bridge
+  // "Utiliser cette commune" depuis l'onglet Ville) — l'initialisation
+  // de useState ne rejouerait jamais dans ce cas ; pattern React officiel
+  // (setState conditionnel pendant le rendu) pour rouvrir la section
+  // automatiquement dès qu'un bien existe, sans effet ni double rendu
+  // superflu. Ne force jamais la fermeture : "Retirer" reste le seul
+  // moyen explicite de refermer.
+  if (realListing !== null && !open) {
+    setOpen(true);
+  }
   const listing = realListing ?? EMPTY_LISTING;
 
   const update = (patch: Partial<RealListing>) => {
