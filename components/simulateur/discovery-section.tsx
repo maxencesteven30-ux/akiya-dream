@@ -56,6 +56,7 @@ import type { CityScoreResult } from "@/lib/city-score";
 import type { MarketContext } from "@/lib/market-context";
 import { MARKET_CONTEXT_LABELS } from "@/lib/market-context";
 import { findPossibleDuplicates, type DuplicateSignal } from "@/lib/discovery/duplicate-detection";
+import { removeFavoriteById, toggleFavorite, type FavoriteSnapshot } from "@/lib/discovery/favorites";
 
 // Era 9 / Phase AN — Discovery UI.
 //
@@ -75,6 +76,7 @@ import { findPossibleDuplicates, type DuplicateSignal } from "@/lib/discovery/du
 
 const CANDIDATES_STORAGE_KEY = "akiya-discovery-candidates";
 const PROFILE_STORAGE_KEY = "akiya-discovery-profile";
+const FAVORITES_STORAGE_KEY = "akiya-discovery-favorites";
 
 const AVAILABILITY_OPTIONS = Object.entries(LISTING_AVAILABILITY_LABELS).map(([value, label]) => ({
   value,
@@ -162,6 +164,15 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
       return null;
     }
   });
+  const [favorites, setFavorites] = useState<FavoriteSnapshot[]>(() => {
+    try {
+      const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+      return raw ? (JSON.parse(raw) as FavoriteSnapshot[]) : [];
+    } catch (err) {
+      console.error("Lecture des favoris depuis localStorage impossible:", err);
+      return [];
+    }
+  });
 
   useEffect(() => {
     try {
@@ -179,6 +190,16 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
       console.error("Écriture du profil de recherche dans localStorage impossible:", err);
     }
   }, [profile]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+    } catch (err) {
+      console.error("Écriture des favoris dans localStorage impossible:", err);
+    }
+  }, [favorites]);
+
+  const handleToggleFavorite = (item: DiscoveryResultItem) => setFavorites((prev) => toggleFavorite(prev, item));
 
   const derivedProfile = useMemo(
     () => deriveSearchProfileFromProject(simulatorState),
@@ -645,6 +666,8 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
                 tint="border-emerald-600/30 bg-emerald-600/5"
                 items={discoveryResult.eligible}
                 opportunityContext={opportunityContext}
+                favorites={favorites}
+                onToggleFavorite={handleToggleFavorite}
               />
               <DiscoveryResultColumn
                 title="À vérifier"
@@ -652,6 +675,8 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
                 tint="border-amber-600/30 bg-amber-600/5"
                 items={discoveryResult.needsReview}
                 opportunityContext={opportunityContext}
+                favorites={favorites}
+                onToggleFavorite={handleToggleFavorite}
               />
               <DiscoveryResultColumn
                 title="Exclus"
@@ -659,8 +684,47 @@ export function DiscoverySection({ simulatorState, regions }: DiscoverySectionPr
                 tint="border-destructive/30 bg-destructive/5"
                 items={discoveryResult.excluded}
                 opportunityContext={opportunityContext}
+                favorites={favorites}
+                onToggleFavorite={handleToggleFavorite}
               />
             </div>
+          </div>
+        )}
+
+        {favorites.length > 0 && (
+          <div className="mt-6 border-t border-border pt-5">
+            <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              ⭐ Mes favoris ({favorites.length})
+            </p>
+            <p className="mb-3 text-xs text-muted-foreground">
+              Instantané figé au moment de la sauvegarde — le profil de recherche a pu changer depuis, ces valeurs
+              ne se remettent jamais à jour toutes seules.
+            </p>
+            <ul className="space-y-2 text-xs">
+              {favorites.map((fav) => (
+                <li
+                  key={fav.listingId}
+                  className="flex flex-col gap-1 rounded-md border border-border bg-card p-2.5 sm:flex-row sm:items-center sm:justify-between"
+                >
+                  <span className="text-foreground">
+                    <span aria-hidden>{VERDICT_ICONS[fav.hardConstraintVerdictAtSave]}</span>{" "}
+                    {fav.title ?? `${fav.source} #${fav.sourceListingId}`}
+                    <span className="text-muted-foreground">
+                      {" "}
+                      — préférences : {fav.softPreferenceScoreAtSave}/{fav.softPreferenceActiveCriteriaCountAtSave} —
+                      sauvegardé le {new Date(fav.savedAt).toLocaleDateString("fr-FR")}
+                    </span>
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setFavorites((prev) => removeFavoriteById(prev, fav.listingId))}
+                  >
+                    Retirer des favoris
+                  </Button>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </Card>
@@ -691,12 +755,16 @@ function DiscoveryResultColumn({
   tint,
   items,
   opportunityContext,
+  favorites,
+  onToggleFavorite,
 }: {
   title: string;
   icon: string;
   tint: string;
   items: DiscoveryResultItem[];
   opportunityContext: OpportunityBridgeContext | null;
+  favorites: FavoriteSnapshot[];
+  onToggleFavorite: (item: DiscoveryResultItem) => void;
 }) {
   return (
     <Card className={`p-4 ${tint}`}>
@@ -708,7 +776,13 @@ function DiscoveryResultColumn({
       ) : (
         <ul className="space-y-2 text-xs">
           {items.map((item) => (
-            <DiscoveryResultCard key={item.listing.id} item={item} opportunityContext={opportunityContext} />
+            <DiscoveryResultCard
+              key={item.listing.id}
+              item={item}
+              opportunityContext={opportunityContext}
+              isFavorite={favorites.some((f) => f.listingId === item.listing.id)}
+              onToggleFavorite={onToggleFavorite}
+            />
           ))}
         </ul>
       )}
@@ -767,9 +841,13 @@ const REALITY_ITEM_LABELS: Partial<Record<keyof PropertyListing, string>> = {
 function DiscoveryResultCard({
   item,
   opportunityContext,
+  isFavorite,
+  onToggleFavorite,
 }: {
   item: DiscoveryResultItem;
   opportunityContext: OpportunityBridgeContext | null;
+  isFavorite: boolean;
+  onToggleFavorite: (item: DiscoveryResultItem) => void;
 }) {
   const [enriching, setEnriching] = useState(false);
   const [enriched, setEnriched] = useState(false);
@@ -809,9 +887,19 @@ function DiscoveryResultCard({
 
   return (
     <li className="rounded-md border border-border bg-card p-2.5">
-      <p className="font-medium text-foreground">
-        {item.listing.title ?? `${item.listing.source} #${item.listing.sourceListingId}`}
-      </p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="font-medium text-foreground">
+          {item.listing.title ?? `${item.listing.source} #${item.listing.sourceListingId}`}
+        </p>
+        <button
+          type="button"
+          aria-label={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+          onClick={() => onToggleFavorite(item)}
+          className="shrink-0 text-base leading-none"
+        >
+          {isFavorite ? "⭐" : "☆"}
+        </button>
+      </div>
       <p className="mt-0.5 text-muted-foreground">
         Correspondance (préférences) : {item.softPreferenceScore.score}/{item.softPreferenceScore.activeCriteriaCount}
       </p>
